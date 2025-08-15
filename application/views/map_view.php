@@ -454,7 +454,7 @@
                 for (var key in properties) {
                     if (properties.hasOwnProperty(key)) {
                         // Khusus untuk field properties, parse dan tampilkan dengan format yang lebih baik
-                        console.log('Processing property:', key);
+                        // console.log('Processing property:', key);
                         if (key === 'properties' && typeof properties[key] === 'string') {
                             try {
                                 // Coba parse sebagai JSON dulu
