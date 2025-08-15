@@ -13,6 +13,7 @@ class Map extends CI_Controller {
     public function index(){ 
         $data['user']=current_user(); 
         $data['kelurahan_list']=$this->mm->kelurahan_list(); 
+        $data['default_kelurahan'] = 'Karimun'; // Set default kelurahan to Karimun
         $data['load_leaflet_draw'] = true; // Memastikan Leaflet.draw dimuat
         $this->load->view('layouts/header',$data); 
         $this->load->view('map_view',$data); 

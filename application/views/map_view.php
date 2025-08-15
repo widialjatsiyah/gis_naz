@@ -164,9 +164,12 @@
 </style>
 
 <script>
+    // Set default kelurahan from PHP
+    var default_kelurahan = <?= isset($default_kelurahan) ? json_encode($default_kelurahan) : 'undefined' ?>;
+    
     $(document).ready(function() {
         // Initialize the map
-        var map = L.map('map').setView([-6.9, 107.6], 12);
+        var map = L.map('map').setView([1.093, 103.386], 12);
         
         // Base layers
         var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -569,6 +572,13 @@
             group.clearLayers();
             layerMap = {}; // Reset layer map
             var k = $('#filterKel').val();
+            
+            // Jika tidak ada filter yang dipilih, gunakan default kelurahan (Karimun)
+            if (!k && typeof default_kelurahan !== 'undefined') {
+                // Set nilai filter ke default kelurahan
+                $('#filterKel').val(default_kelurahan);
+                k = default_kelurahan;
+            }
             
             // Cek apakah nilai filter adalah ID file KML (angka) atau nama kelurahan (string)
             if (k && !isNaN(k)) {
