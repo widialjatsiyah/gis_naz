@@ -9,12 +9,12 @@ class Map_model extends CI_Model {
     public function get_all($kel=null){ 
         // Dapatkan data dari tabel geojson_data (data lama)
         if($kel) $this->db->where('kelurahan',$kel); 
-        $this->db->order_by('id','DESC'); 
+        $this->db->order_by('id','ASC'); 
         $old_data = $this->db->get($this->table)->result();
         
         // Dapatkan data dari tabel kml_data_detail (data KML baru)
         if($kel) $this->db->where('kelurahan',$kel); 
-        $this->db->order_by('id','DESC'); 
+        $this->db->order_by('id','ASC'); 
         $kml_data = $this->db->get($this->kml_detail_table)->result();
         
         // Gabungkan data
@@ -36,7 +36,7 @@ class Map_model extends CI_Model {
     // Fungsi untuk mendapatkan detail data KML berdasarkan ID file
     public function get_kml_data_by_head_id($head_id) {
         $this->db->where('head_id', $head_id);
-        $this->db->order_by('id', 'DESC');
+        $this->db->order_by('id', 'ASC');
         return $this->db->get($this->kml_detail_table)->result();
     }
     
