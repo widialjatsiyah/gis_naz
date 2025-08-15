@@ -14,7 +14,7 @@ class Kml_model extends CI_Model {
               `description` text,
               `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
               PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         ");
 
         // Membuat tabel detail
@@ -32,7 +32,7 @@ class Kml_model extends CI_Model {
               PRIMARY KEY (`id`),
               KEY `head_id` (`head_id`),
               CONSTRAINT `fk_kml_head` FOREIGN KEY (`head_id`) REFERENCES `{$this->head_table}` (`id`) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         ");
     }
     
