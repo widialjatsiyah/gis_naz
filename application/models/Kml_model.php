@@ -50,18 +50,24 @@ class Kml_model extends CI_Model {
         foreach ($features as $feature) {
             $detail_data = [
                 'head_id' => $head_id,
-                'kelurahan' => $feature['kelurahan'],
-                'kategori' => $feature['kategori'],
-                'name' => $feature['name'],
-                'color' => $feature['color'],
-                'properties' => $feature['properties'],
-                'geometry' => $feature['geometry']
+                'kelurahan' => isset($feature['properties']['kelurahan']) ? $feature['properties']['kelurahan'] : '',
+                'kategori' => isset($feature['properties']['kategori']) ? $feature['properties']['kategori'] : '',
+                'name' => isset($feature['properties']['name']) ? $feature['properties']['name'] : '',
+                'color' => isset($feature['properties']['color']) ? $feature['properties']['color'] : '#3388ff',
+                'properties' => json_encode($feature['properties']),
+                'geometry' => json_encode($feature['geometry'])
             ];
             
             $this->db->insert($this->detail_table, $detail_data);
         }
         
         return $head_id;
+    }
+    
+    public function delete_head_data($id) {
+        // Karena sudah menggunakan CONSTRAINT ON DELETE CASCADE, 
+        // menghapus head akan otomatis menghapus semua detail terkait
+        return $this->db->delete($this->head_table, ['id' => $id]);
     }
     
     // Fungsi baru untuk menyimpan data detail ke tabel kml_data_detail
@@ -93,10 +99,6 @@ class Kml_model extends CI_Model {
         return $this->db->get_where($this->detail_table, ['head_id' => $head_id])->result_array();
     }
     
-    public function delete_kml($id) {
-        $this->db->where('id', $id);
-        return $this->db->delete($this->head_table);
-    }
     
     public function update_kml_head($id, $data) {
         $this->db->where('id', $id);

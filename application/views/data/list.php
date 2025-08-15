@@ -41,6 +41,11 @@
                                         <a href="<?= base_url('data/view_kml/'.$kml['id']) ?>" class="btn btn-sm btn-info">
                                             <i class="fas fa-eye"></i> Lihat Detail
                                         </a>
+                                        <?php if (is_admin()): ?>
+                                        <a href="#" class="btn btn-sm btn-danger" onclick="confirmDelete(<?= $kml['id'] ?>, '<?= htmlspecialchars($kml['name'], ENT_QUOTES) ?>')">
+                                            <i class="fas fa-trash"></i> Hapus
+                                        </a>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -49,8 +54,7 @@
                     </div>
                     <?php else: ?>
                     <div class="alert alert-info">
-                        <p>Belum ada data KML yang diunggah.</p>
-                        <p>Silakan upload file KML terlebih dahulu dengan tombol "Upload KML Baru" di atas.</p>
+                        Tidak ada data KML yang tersedia.
                     </div>
                     <?php endif; ?>
                 </div>
@@ -58,3 +62,32 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Konfirmasi Hapus -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">Konfirmasi Hapus</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Apakah Anda yakin ingin menghapus data KML <strong id="deleteKmlName"></strong>?</p>
+                <p class="text-danger">Peringatan: Tindakan ini akan menghapus seluruh data detail yang terkait dengan file KML ini dan tidak dapat dibatalkan.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <a href="#" id="confirmDeleteBtn" class="btn btn-danger">Hapus</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(id, name) {
+    document.getElementById('deleteKmlName').textContent = name;
+    document.getElementById('confirmDeleteBtn').href = '<?= base_url('data/delete_kml/') ?>' + id;
+    var deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+    deleteModal.show();
+}
+</script>

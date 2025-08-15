@@ -18,3 +18,11 @@ function is_admin()
     $u = current_user();
     return $u && isset($u['role']) && $u['role'] === 'admin';
 }
+
+function check_admin()
+{
+    if (!is_admin()) {
+        show_error('Akses ditolak. Hanya administrator yang dapat mengakses halaman ini.', 403);
+        exit;
+    }
+}

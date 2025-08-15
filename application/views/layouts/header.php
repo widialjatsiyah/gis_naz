@@ -106,7 +106,7 @@
             <ul class="nav flex-column">
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('map') ?>">Peta</a></li>
                 <?php if(is_admin()): ?>
-                <li class="nav-item"><a class="nav-link" href="<?= base_url('upload/kml') ?>">Upload KML</a></li>
+                <!-- <li class="nav-item"><a class="nav-link" href="<?= base_url('upload/kml') ?>">Upload KML</a></li> -->
                 <!-- <li class="nav-item"><a class="nav-link" href="<?= base_url('geojson/import') ?>">Import GeoJSON</a></li> -->
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('data') ?>">Manajemen Data</a></li>
                 <?php endif; ?>
