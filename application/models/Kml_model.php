@@ -4,16 +4,32 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Kml_model extends CI_Model {
     private $head_table = 'kml_data_head';
     private $detail_table = 'kml_data_detail';
+    private $kecamatan_table = 'master_kecamatan';
     
     public function create_tables_if_not_exists() {
+        // Membuat tabel master kecamatan
+        $this->db->query("
+            CREATE TABLE IF NOT EXISTS `{$this->kecamatan_table}` (
+              `id` int NOT NULL AUTO_INCREMENT,
+              `name` varchar(255) NOT NULL,
+              `description` text,
+              `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `unique_name` (`name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+        ");
+
         // Membuat tabel head
         $this->db->query("
             CREATE TABLE IF NOT EXISTS `{$this->head_table}` (
               `id` int NOT NULL AUTO_INCREMENT,
+              `kecamatan_id` int DEFAULT NULL,
               `name` varchar(255) DEFAULT NULL,
               `description` text,
               `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-              PRIMARY KEY (`id`)
+              PRIMARY KEY (`id`),
+              KEY `kecamatan_id` (`kecamatan_id`),
+              CONSTRAINT `fk_kecamatan` FOREIGN KEY (`kecamatan_id`) REFERENCES `{$this->kecamatan_table}` (`id`) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         ");
 
@@ -36,9 +52,10 @@ class Kml_model extends CI_Model {
         ");
     }
     
-    public function save_kml_data($name, $description, $features) {
+    public function save_kml_data($name, $description, $features, $kecamatan_id = null) {
         // Simpan data head
         $head_data = [
+            'kecamatan_id' => $kecamatan_id,
             'name' => $name,
             'description' => $description
         ];
@@ -64,59 +81,83 @@ class Kml_model extends CI_Model {
         return $head_id;
     }
     
-    public function delete_head_data($id) {
-        // Karena sudah menggunakan CONSTRAINT ON DELETE CASCADE, 
-        // menghapus head akan otomatis menghapus semua detail terkait
-        return $this->db->delete($this->head_table, ['id' => $id]);
-    }
-    
-    // Fungsi baru untuk menyimpan data detail ke tabel kml_data_detail
-    public function save_kml_detail($data) {
-        return $this->db->insert($this->detail_table, $data);
-    }
-    
-    public function get_all_kml() {
-        return $this->db->get($this->head_table)->result_array();
-    }
-    
     public function get_all_head_data() {
-        return $this->db->get($this->head_table)->result_array();
-    }
-    
-    public function get_kml_by_id($id) {
-        return $this->db->get_where($this->head_table, ['id' => $id])->row_array();
+        $this->db->select("{$this->head_table}.*, {$this->kecamatan_table}.name as kecamatan_name");
+        $this->db->from($this->head_table);
+        $this->db->join($this->kecamatan_table, "{$this->head_table}.kecamatan_id = {$this->kecamatan_table}.id", 'left');
+        $this->db->order_by("{$this->kecamatan_table}.name", 'ASC');
+        $this->db->order_by("{$this->head_table}.name", 'ASC');
+        return $this->db->get()->result_array();
     }
     
     public function get_head_by_id($id) {
-        return $this->db->get_where($this->head_table, ['id' => $id])->row_array();
-    }
-    
-    public function get_kml_details($head_id) {
-        return $this->db->get_where($this->detail_table, ['head_id' => $head_id])->result_array();
+        $this->db->select("{$this->head_table}.*, {$this->kecamatan_table}.name as kecamatan_name");
+        $this->db->from($this->head_table);
+        $this->db->join($this->kecamatan_table, "{$this->head_table}.kecamatan_id = {$this->kecamatan_table}.id", 'left');
+        $this->db->where("{$this->head_table}.id", $id);
+        return $this->db->get()->row_array();
     }
     
     public function get_detail_data($head_id) {
         return $this->db->get_where($this->detail_table, ['head_id' => $head_id])->result_array();
     }
     
+    public function delete_head_data($id) {
+        // Karena sudah menggunakan CONSTRAINT ON DELETE CASCADE, 
+        // menghapus head akan otomatis menghapus semua detail terkait
+        return $this->db->delete($this->head_table, ['id' => $id]);
+    }
     
     public function update_kml_head($id, $data) {
         $this->db->where('id', $id);
         return $this->db->update($this->head_table, $data);
     }
     
-    public function update_kml_detail($id, $data) {
-        $this->db->where('id', $id);
-        return $this->db->update($this->detail_table, $data);
+    // Fungsi untuk menyimpan detail data KML (digunakan saat menyimpan polygon yang digambar)
+    public function save_kml_detail($data) {
+        return $this->db->insert($this->detail_table, $data);
     }
     
-    // Fungsi untuk mengambil data detail berdasarkan ID
+    // Fungsi untuk mendapatkan detail data KML berdasarkan ID
     public function get_kml_detail_by_id($id) {
         return $this->db->get_where($this->detail_table, ['id' => $id])->row();
     }
     
-    // Fungsi untuk menghapus data detail berdasarkan ID
+    // Fungsi untuk mengupdate detail data KML
+    public function update_kml_detail($id, $data) {
+        return $this->db->where('id', $id)->update($this->detail_table, $data);
+    }
+    
+    // Fungsi untuk menghapus detail data KML
     public function delete_kml_detail($id) {
         return $this->db->delete($this->detail_table, ['id' => $id]);
+    }
+    
+    // Fungsi untuk mengelola data kecamatan
+    public function get_all_kecamatan() {
+        $this->db->order_by('name', 'ASC');
+        return $this->db->get($this->kecamatan_table)->result_array();
+    }
+    
+    public function get_kecamatan_by_id($id) {
+        return $this->db->get_where($this->kecamatan_table, ['id' => $id])->row_array();
+    }
+    
+    public function save_kecamatan($data) {
+        $this->db->insert($this->kecamatan_table, $data);
+        return $this->db->insert_id();
+    }
+    
+    public function update_kecamatan($id, $data) {
+        return $this->db->where('id', $id)->update($this->kecamatan_table, $data);
+    }
+    
+    public function delete_kecamatan($id) {
+        return $this->db->delete($this->kecamatan_table, ['id' => $id]);
+    }
+    
+    // Fungsi untuk mendapatkan KML head berdasarkan kecamatan
+    public function get_kml_by_kecamatan($kecamatan_id) {
+        return $this->db->get_where($this->head_table, ['kecamatan_id' => $kecamatan_id])->result_array();
     }
 }

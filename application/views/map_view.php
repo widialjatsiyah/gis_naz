@@ -161,6 +161,11 @@
     width: 120px;
     vertical-align: top;
   }
+  
+  .polygon-label {
+    font-size: 10px;
+    color: #333;
+  }
 </style>
 
 <script>
@@ -402,6 +407,14 @@
                 return;
             }
             
+            // Hapus label yang ada sebelum mengupdate
+            if (layer.labels) {
+                layer.labels.forEach(function(label) {
+                    map.removeLayer(label);
+                });
+                layer.labels = [];
+            }
+            
             var geojson = layer.toGeoJSON();
             var color = layer.options.color || '#3388ff';
             
@@ -425,6 +438,28 @@
                             showSuccessAlert('Polygon berhasil diupdate!');
                             // Update layer di peta tanpa reload
                             updateLayerOnMap(layer, id, geojson, color, layer.feature.properties);
+                            
+                            // Tambahkan kembali label dengan 5 digit terakhir jika nama sesuai pola
+                            var lastFiveDigits = extractLastFiveDigits(layer.feature.properties.name);
+                            if (lastFiveDigits) {
+                                // Buat label di tengah poligon
+                                var label = L.marker(layer.getBounds().getCenter(), {
+                                    icon: L.divIcon({
+                                        className: 'polygon-label',
+                                        html: '<div style="background: rgba(255, 255, 255, 0.8); padding: 2px 5px; border-radius: 3px; font-weight: bold; text-align: center;">' + lastFiveDigits + '</div>',
+                                        iconSize: [50, 20]
+                                    })
+                                }).addTo(map);
+                                
+                                // Tambahkan event listener untuk menampilkan detail ketika label diklik
+                                label.on('click', function(e) {
+                                    showPolygonDetail(id, layer.feature.properties, layer);
+                                });
+                                
+                                // Simpan referensi label
+                                if (!layer.labels) layer.labels = [];
+                                layer.labels.push(label);
+                            }
                         } else {
                             throw new Error(result.message || 'Unknown error occurred');
                         }
@@ -573,6 +608,9 @@
             layerMap = {}; // Reset layer map
             var k = $('#filterKel').val();
             
+            // Hapus semua label yang ada
+            $('.polygon-label').remove();
+            
             // Jika tidak ada filter yang dipilih, gunakan default kelurahan (Karimun)
             if (!k && typeof default_kelurahan !== 'undefined') {
                 // Set nilai filter ke default kelurahan
@@ -613,6 +651,28 @@
                                     // Simpan referensi layer
                                     layerMap[r.id] = l;
                                     
+                                    // Tambahkan label dengan 5 digit terakhir jika nama sesuai pola
+                                    var lastFiveDigits = extractLastFiveDigits(r.name);
+                                    if (lastFiveDigits) {
+                                        // Buat label di tengah poligon
+                                        var label = L.marker(l.getBounds().getCenter(), {
+                                            icon: L.divIcon({
+                                                className: 'polygon-label',
+                                                html: '<div style="background: rgba(255, 255, 255, 0.8); padding: 2px 5px; border-radius: 3px; font-weight: bold; text-align: center;">' + lastFiveDigits + '</div>',
+                                                iconSize: [50, 20]
+                                            })
+                                        }).addTo(map);
+                                        
+                                        // Tambahkan event listener untuk menampilkan detail ketika label diklik
+                                        label.on('click', function(e) {
+                                            showPolygonDetail(r.id, l.feature.properties, l);
+                                        });
+                                        
+                                        // Simpan referensi label agar bisa dihapus nanti
+                                        if (!l.labels) l.labels = [];
+                                        l.labels.push(label);
+                                    }
+                                    
                                     // Hanya tambahkan popup dan event untuk admin
                                     <?php if (isset($user) && is_admin()): ?>
                                     // Tambahkan event klik untuk menampilkan detail
@@ -639,8 +699,13 @@
             });
         }
         
-        // Fungsi global untuk edit polygon
+        // Fungsi global untuk edit polygon (hanya untuk admin)
         window.editPolygon = function(id, element) {
+            // Hanya admin yang bisa mengedit polygon
+            <?php if (!isset($user) || !is_admin()): ?>
+            return;
+            <?php endif; ?>
+            
             // Sembunyikan modal detail
             hidePolygonDetail();
             
@@ -666,8 +731,13 @@
             editModal.show();
         };
         
-        // Fungsi global untuk hapus polygon
+        // Fungsi global untuk hapus polygon (hanya untuk admin)
         window.deletePolygonById = function(id) {
+            // Hanya admin yang bisa menghapus polygon
+            <?php if (!isset($user) || !is_admin()): ?>
+            return;
+            <?php endif; ?>
+            
             // Sembunyikan modal detail
             hidePolygonDetail();
 
@@ -724,6 +794,16 @@
             setTimeout(function() {
                 $('#errorAlert').hide();
             }, 3000);
+        }
+        
+        // Fungsi untuk mengekstrak 5 digit terakhir dari nama jika sesuai pola
+        function extractLastFiveDigits(name) {
+            // Cek apakah nama memiliki format seperti 210200300101005380 (hanya angka)
+            if (name && /^\d+$/.test(name) && name.length >= 5) {
+                // Ambil 5 digit terakhir
+                return name.slice(-5);
+            }
+            return null;
         }
         
         // Initial load

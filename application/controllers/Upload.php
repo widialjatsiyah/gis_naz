@@ -15,33 +15,63 @@ class Upload extends CI_Controller
 
     public function kml()
     {
+        // Cek apakah ini request AJAX
+        $is_ajax = $this->input->is_ajax_request();
+        
+        // Dapatkan daftar kecamatan untuk ditampilkan di form
+        $data['kecamatan_list'] = $this->Kml_model->get_all_kecamatan();
+        
         if ($this->input->method(TRUE) === 'POST' && isset($_FILES['kml'])) {
             $target = FCPATH . 'public/data/uploads/' . time() . '_' . basename($_FILES['kml']['name']);
             if (!move_uploaded_file($_FILES['kml']['tmp_name'], $target)) {
-                $this->session->set_flashdata('msg', 'Upload gagal');
-                redirect('data');
+                $error_msg = 'Upload gagal';
+                if ($is_ajax) {
+                    echo json_encode(['status' => 'error', 'message' => $error_msg]);
+                    return;
+                } else {
+                    $this->session->set_flashdata('msg', $error_msg);
+                    redirect('upload/kml');
+                }
             }
             
             $xml = @simplexml_load_file($target);
             if (!$xml) {
-                $this->session->set_flashdata('msg', 'KML invalid');
-                redirect('data');
+                $error_msg = 'KML invalid';
+                if ($is_ajax) {
+                    echo json_encode(['status' => 'error', 'message' => $error_msg]);
+                    return;
+                } else {
+                    $this->session->set_flashdata('msg', $error_msg);
+                    redirect('upload/kml');
+                }
             }
             
             // Register namespaces
             $xml->registerXPathNamespace('kml', 'http://www.opengis.net/kml/2.2');
             
-            // Coba berbagai kemungkinan XPath untuk placemarks
-            $placemarks = $xml->xpath('//Placemark') ?: $xml->xpath('//kml:Placemark');
+            // Coba berbagai kemungkinan XPath untuk placemarks (termasuk yang di dalam folder)
+            $placemarks = $xml->xpath('//Placemark[Polygon]') ?: $xml->xpath('//kml:Placemark[kml:Polygon]');
             
             if (!$placemarks) {
-                $this->session->set_flashdata('msg', 'Tidak ditemukan Placemark dalam file KML');
-                redirect('data');
+                $error_msg = 'Tidak ditemukan Placemark dengan Polygon dalam file KML';
+                if ($is_ajax) {
+                    echo json_encode(['status' => 'error', 'message' => $error_msg]);
+                    return;
+                } else {
+                    $this->session->set_flashdata('msg', $error_msg);
+                    redirect('upload/kml');
+                }
             }
             
             // Dapatkan nama dan deskripsi dokumen KML
             $kml_name = (string)($xml->Document->name ?? $xml->name ?? 'KML File');
             $kml_description = (string)($xml->Document->description ?? $xml->description ?? '');
+            
+            // Dapatkan kecamatan_id dari form
+            $kecamatan_id = $this->input->post('kecamatan_id') ?: null;
+            
+            // Ekstrak styles dari KML
+            $styles = $this->extractStyles($xml);
             
             // Proses placemarks
             $placemark_data = [];
@@ -49,88 +79,154 @@ class Upload extends CI_Controller
                 $name = (string)($pm->name ?? '');
                 if (empty($name)) {
                     // Coba dapatkan nama dari field lain jika tidak ada name
-                    $extended_data = $pm->xpath('.//Data[@name="KELURAHAN"]') ?: 
-                                   $pm->xpath('.//kml:Data[@name="KELURAHAN"]');
-                    if ($extended_data && isset($extended_data[0]['value'])) {
-                        $name = (string)$extended_data[0]['value'];
-                    } else {
-                        $name = (string)($pm->ExtendedData->Data->value ?? '');
+                    $name = (string)($pm->description ?? '');
+                }
+                
+                // Ekstrak properties
+                $properties = [];
+                if ($pm->ExtendedData && $pm->ExtendedData->Data) {
+                    foreach ($pm->ExtendedData->Data as $data) {
+                        $properties[(string)$data['name']] = (string)$data->value;
                     }
                 }
                 
-                // Cari coordinates dengan berbagai kemungkinan struktur
-                $coords = $pm->xpath('.//coordinates') ?: 
-                         $pm->xpath('.//kml:coordinates') ?: 
-                         $pm->Polygon->outerBoundaryIs->LinearRing->coordinates ?:
-                         $pm->MultiGeometry->Polygon->outerBoundaryIs->LinearRing->coordinates;
+                // Tambahkan name dan description ke properties
+                if (!empty($name)) {
+                    $properties['name'] = $name;
+                }
                 
-                if (!$coords) continue;
+                if (!empty((string)$pm->description)) {
+                    $properties['description'] = (string)$pm->description;
+                }
                 
-                foreach ($coords as $c) {
-                    $text = trim((string)$c);
-                    if (!$text) continue;
-                    
-                    $pairs = preg_split('/\s+/', trim($text));
-                    $pts = [];
-                    foreach ($pairs as $p) {
-                        $parts = explode(',', trim($p));
-                        if (count($parts) >= 2) {
-                            $lon = floatval($parts[0]);
-                            $lat = floatval($parts[1]);
-                            $pts[] = [$lon, $lat];
-                        }
+                // Ekstrak warna dari style
+                $color = '#3388ff'; // default color
+                if (isset($pm->styleUrl)) {
+                    $styleUrl = (string)$pm->styleUrl;
+                    // Hapus tanda # di awal jika ada
+                    $styleUrl = ltrim($styleUrl, '#');
+                    if (isset($styles[$styleUrl])) {
+                        $color = $styles[$styleUrl];
                     }
+                }
+                $properties['color'] = $color;
+                
+                // Ekstrak geometry (hanya Polygon untuk saat ini)
+                $geometry = null;
+                if ($pm->Polygon) {
+                    $geometry = [
+                        'type' => 'Polygon',
+                        'coordinates' => []
+                    ];
                     
-                    if (count($pts) < 3) continue;
-                    
-                    // Pastikan polygon tertutup
-                    if ($pts[0] != $pts[count($pts) - 1]) $pts[] = $pts[0];
-                    
-                    $geom = ['type' => 'Polygon', 'coordinates' => [$pts]];
-                    
-                    // Siapkan properti tambahan
-                    $properties = [];
-                    if (isset($pm->description)) {
-                        $properties['description'] = (string)$pm->description;
-                    }
-                    
-                    // Tambahkan data extended ke properties
-                    $extended_data_elements = $pm->xpath('.//Data') ?: $pm->xpath('.//kml:Data');
-                    if ($extended_data_elements) {
-                        foreach ($extended_data_elements as $data) {
-                            $attr_name = (string)($data['name'] ?? '');
-                            if ($attr_name) {
-                                $properties[$attr_name] = (string)($data->value ?? '');
+                    // Ekstrak koordinat
+                    if ($pm->Polygon->outerBoundaryIs && $pm->Polygon->outerBoundaryIs->LinearRing) {
+                        $coords_text = (string)$pm->Polygon->outerBoundaryIs->LinearRing->coordinates;
+                        $coords_array = [];
+                        
+                        // Parse coordinates
+                        $coords_lines = preg_split('/\s+/', trim($coords_text));
+                        foreach ($coords_lines as $line) {
+                            $line = trim($line);
+                            if (!empty($line)) {
+                                $coords = explode(',', $line);
+                                if (count($coords) >= 2) {
+                                    $coords_array[] = [(float)$coords[0], (float)$coords[1]];
+                                }
                             }
                         }
+                        
+                        $geometry['coordinates'] = [$coords_array];
                     }
-                    
+                }
+                
+                if ($geometry) {
                     $placemark_data[] = [
-                        'kelurahan' => $name, 
-                        'kategori' => null, 
-                        'name' => $name, 
-                        'color' => '#3388ff', 
-                        'geometry' => json_encode($geom, JSON_UNESCAPED_UNICODE), 
-                        'properties' => json_encode($properties)
+                        'properties' => $properties,
+                        'geometry' => $geometry
                     ];
                 }
             }
             
-            if (empty($placemark_data)) {
-                $this->session->set_flashdata('msg', 'Tidak ada data yang dapat diimpor dari file KML');
-                redirect('data');
+            // Simpan data ke database dengan kecamatan_id
+            $this->Kml_model->save_kml_data($kml_name, $kml_description, $placemark_data, $kecamatan_id);
+            
+            $success_msg = 'KML file berhasil diupload dan diproses';
+            if ($is_ajax) {
+                echo json_encode(['status' => 'success', 'message' => $success_msg]);
+                return;
+            } else {
+                $this->session->set_flashdata('msg', $success_msg);
+                redirect('data/list_kml');
             }
-            
-            // Simpan data dengan struktur head-detail
-            $this->Kml_model->create_tables_if_not_exists();
-            $head_id = $this->Kml_model->save_kml_data($kml_name, $kml_description, $placemark_data);
-            
-            $this->session->set_flashdata('msg', 'Berhasil mengimpor ' . count($placemark_data) . ' fitur dari KML dengan ID: ' . $head_id);
-            redirect('data/list_kml');
         }
         
-        $this->load->view('layouts/header', ['user' => current_user()]);
-        $this->load->view('upload/kml_form');
-        $this->load->view('layouts/footer');
+        // Jika bukan AJAX request, tampilkan form seperti biasa
+        if (!$is_ajax) {
+            $this->load->view('layouts/header', ['user' => current_user()]);
+            $this->load->view('upload/kml_form', $data);
+            $this->load->view('layouts/footer');
+        } else {
+            // Untuk AJAX request, kirim data form
+            echo json_encode(['status' => 'form', 'data' => $data]);
+        }
+    }
+    
+    /**
+     * Ekstrak styles dari KML untuk digunakan dalam menentukan warna polygon
+     */
+    private function extractStyles($xml) {
+        $styles = [];
+        
+        // Ekstrak Style elements
+        $styleElements = $xml->xpath('//Style') ?: $xml->xpath('//kml:Style');
+        foreach ($styleElements as $style) {
+            $styleId = (string)$style['id'];
+            if (!empty($styleId) && isset($style->PolyStyle->color)) {
+                // Konversi warna KML (aabbggrr) ke format web (rrggbb)
+                $kmlColor = (string)$style->PolyStyle->color;
+                $webColor = $this->kmlColorToWeb($kmlColor);
+                $styles[$styleId] = $webColor;
+            }
+        }
+        
+        // Ekstrak StyleMap elements
+        $styleMapElements = $xml->xpath('//StyleMap') ?: $xml->xpath('//kml:StyleMap');
+        foreach ($styleMapElements as $styleMap) {
+            $styleMapId = (string)$styleMap['id'];
+            if (!empty($styleMapId)) {
+                // Cari pasangan dengan key=normal
+                foreach ($styleMap->Pair as $pair) {
+                    if ((string)$pair->key === 'normal' && isset($pair->styleUrl)) {
+                        $styleUrl = ltrim((string)$pair->styleUrl, '#');
+                        if (isset($styles[$styleUrl])) {
+                            $styles[$styleMapId] = $styles[$styleUrl];
+                        }
+                    }
+                }
+            }
+        }
+        
+        return $styles;
+    }
+    
+    /**
+     * Konversi warna KML (aabbggrr) ke format web (rrggbb)
+     */
+    private function kmlColorToWeb($kmlColor) {
+        // KML color format: aabbggrr (alpha, blue, green, red)
+        // Web color format: rrggbb (red, green, blue)
+        if (strlen($kmlColor) == 8) {
+            $alpha = substr($kmlColor, 0, 2);
+            $blue = substr($kmlColor, 2, 2);
+            $green = substr($kmlColor, 4, 2);
+            $red = substr($kmlColor, 6, 2);
+            
+            // Format web: rrggbb
+            return '#' . $red . $green . $blue;
+        }
+        
+        // Return default jika format tidak sesuai
+        return '#3388ff';
     }
 }
