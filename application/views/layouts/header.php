@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         body {
             height: 100vh;
@@ -56,6 +57,8 @@
     <!-- Memuat library DataTables -->
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <!-- Memuat library Select2 -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
     <!-- Memuat library Leaflet.draw jika diperlukan -->
     <?php if (isset($load_leaflet_draw) && $load_leaflet_draw): ?>
@@ -107,7 +110,7 @@
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('map') ?>">Peta</a></li>
                 <?php if(is_admin()): ?>
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('data/list_kml') ?>">Data KML</a></li>
-                <!-- <li class="nav-item"><a class="nav-link" href="<?= base_url('upload/kml') ?>">Upload KML</a></li> -->
+                <li class="nav-item"><a class="nav-link" href="<?= base_url('upload/kml') ?>">Upload KML</a></li>
                 <!-- <li class="nav-item"><a class="nav-link" href="<?= base_url('geojson/import') ?>">Import GeoJSON</a></li> -->
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('kecamatan') ?>">Master Kecamatan</a></li>
                 <?php endif; ?>
@@ -115,7 +118,10 @@
             </ul>
             <hr/>
             <div class="mb-2">
-                <select id="filterKec" class="form-select mb-2">
+                <h6>Filter</h6>
+                <div class="form-group">
+                    <label for="filterKec">Kecamatan</label>
+                     <select id="filterKec" class="form-select mb-2 select2-filter">
                     <option value="">Semua Kecamatan</option>
                     <?php if (isset($kecamatan_list)): ?>
                         <?php foreach($kecamatan_list as $k): ?>
@@ -123,7 +129,10 @@
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </select>
-                <select id="filterKel" class="form-select">
+                </div>
+               <div class="form-group">
+                    <label for="filterKel">Kelurahan</label>
+                <select id="filterKel" class="form-select select2-filter">
                     <option value="">Semua Kelurahan</option>
                     <?php foreach($kelurahan_list as $k): ?>
                         <?php if (property_exists($k, 'id') && is_numeric($k->id)): ?>
@@ -135,6 +144,7 @@
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </select>
+               </div>
             </div>
         </div>
         <div class="content">

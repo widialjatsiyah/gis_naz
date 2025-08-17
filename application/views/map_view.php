@@ -173,6 +173,13 @@
     var default_kelurahan = <?= isset($default_kelurahan) ? json_encode($default_kelurahan) : 'undefined' ?>;
     
     $(document).ready(function() {
+        // Initialize Select2 for filter dropdowns
+        $('.select2-filter').select2({
+            placeholder: "Pilih atau cari...",
+            allowClear: true,
+            width: '100%'
+        });
+        
         // Initialize the map
         var map = L.map('map').setView([1.093, 103.386], 12);
         
@@ -223,7 +230,7 @@
             }
             
             // Reset kelurahan selection
-            $('#filterKel').val('');
+            $('#filterKel').val('').trigger('change');
             
             // Load data
             loadData();
