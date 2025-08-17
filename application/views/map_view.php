@@ -208,6 +208,30 @@
         var currentDeleteId = null; // Untuk menyimpan ID yang akan dihapus
         var currentEditLayer = null; // Untuk menyimpan layer yang sedang diedit
         
+        // Filter kelurahan berdasarkan kecamatan yang dipilih
+        $('#filterKec').on('change', function() {
+            var kecId = $(this).val();
+            $('#filterKel option').show();
+            
+            if (kecId) {
+                $('#filterKel option[data-kecamatan]').each(function() {
+                    var optionKecId = $(this).data('kecamatan');
+                    if (optionKecId != kecId) {
+                        $(this).hide();
+                    }
+                });
+            }
+            
+            // Reset kelurahan selection
+            $('#filterKel').val('');
+            
+            // Load data
+            loadData();
+        });
+        
+        // Reload data when filter changes
+        $('#filterKel').on('change', loadData);
+        
         // Hanya aktifkan drawing tools untuk admin
         <?php if (isset($user) && is_admin()): ?>
         // Inisialisasi feature group untuk drawing
@@ -607,25 +631,32 @@
             group.clearLayers();
             layerMap = {}; // Reset layer map
             var k = $('#filterKel').val();
+            var kec = $('#filterKec').val();
             
             // Hapus semua label yang ada
             $('.polygon-label').remove();
             
             // Jika tidak ada filter yang dipilih, gunakan default kelurahan (Karimun)
-            if (!k && typeof default_kelurahan !== 'undefined') {
-                // Set nilai filter ke default kelurahan
+            if (!k && typeof default_kelurahan !== 'undefined' && !kec) {
+                // Set nilai filter ke default kelurahan hanya jika tidak ada filter kecamatan
                 $('#filterKel').val(default_kelurahan);
                 k = default_kelurahan;
             }
             
-            // Cek apakah nilai filter adalah ID file KML (angka) atau nama kelurahan (string)
+            // Tentukan URL berdasarkan filter
+            var url;
             if (k && !isNaN(k)) {
-                // Jika angka, maka ini adalah ID file KML
-                var url = '<?= base_url('index.php/map/kml_data/') ?>' + k;
+                // Jika kelurahan adalah ID file KML (angka)
+                url = '<?= base_url('index.php/map/kml_data/') ?>' + k;
+            } else if (k) {
+                // Jika kelurahan biasa (bukan angka)
+                url = '<?= base_url('index.php/map/data') ?>?kelurahan=' + encodeURIComponent(k);
+            } else if (kec) {
+                // Jika hanya kecamatan yang dipilih
+                url = '<?= base_url('index.php/map/data') ?>?kecamatan=' + encodeURIComponent(kec);
             } else {
-                // Jika bukan angka, maka ini adalah filter kelurahan biasa
-                var url = '<?= base_url('index.php/map/data') ?>';
-                if (k) url += '?kelurahan=' + encodeURIComponent(k);
+                // Jika tidak ada filter
+                url = '<?= base_url('index.php/map/data') ?>';
             }
             
             $.getJSON(url, function(rows) {
@@ -808,9 +839,6 @@
         
         // Initial load
         loadData();
-        
-        // Reload data when filter changes
-        $('#filterKel').on('change', loadData);
         
         // Export button
         $('#btnExportGeo').on('click', function() {

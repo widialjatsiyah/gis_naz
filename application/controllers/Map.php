@@ -13,6 +13,7 @@ class Map extends CI_Controller {
     public function index(){ 
         $data['user']=current_user(); 
         $data['kelurahan_list']=$this->mm->kelurahan_list(); 
+        $data['kecamatan_list']=$this->mm->kecamatan_list(); // Menambahkan daftar kecamatan
         $data['default_kelurahan'] = 'Karimun'; // Set default kelurahan to Karimun
         $data['load_leaflet_draw'] = true; // Memastikan Leaflet.draw dimuat
         $this->load->view('layouts/header',$data); 
@@ -21,9 +22,18 @@ class Map extends CI_Controller {
     }
     
     public function data(){ 
-        $kel=$this->input->get('kelurahan',TRUE); 
-        $rows=$this->mm->get_all($kel); 
-        return $this->output->set_content_type('application/json')->set_output(json_encode($rows)); 
+        $kel = $this->input->get('kelurahan', TRUE);
+        $kec = $this->input->get('kecamatan', TRUE);
+        
+        if ($kec) {
+            // Jika ada filter kecamatan
+            $rows = $this->mm->get_by_kecamatan($kec);
+        } else {
+            // Jika tidak ada filter kecamatan, gunakan filter kelurahan seperti biasa
+            $rows = $this->mm->get_all($kel);
+        }
+        
+        return $this->output->set_content_type('application/json')->set_output(json_encode($rows));
     }
     
     // Fungsi baru untuk mendapatkan data KML berdasarkan ID file

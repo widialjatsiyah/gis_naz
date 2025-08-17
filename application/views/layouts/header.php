@@ -107,7 +107,7 @@
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('map') ?>">Peta</a></li>
                 <?php if(is_admin()): ?>
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('data/list_kml') ?>">Data KML</a></li>
-                <li class="nav-item"><a class="nav-link" href="<?= base_url('upload/kml') ?>">Upload KML</a></li>
+                <!-- <li class="nav-item"><a class="nav-link" href="<?= base_url('upload/kml') ?>">Upload KML</a></li> -->
                 <!-- <li class="nav-item"><a class="nav-link" href="<?= base_url('geojson/import') ?>">Import GeoJSON</a></li> -->
                 <li class="nav-item"><a class="nav-link" href="<?= base_url('kecamatan') ?>">Master Kecamatan</a></li>
                 <?php endif; ?>
@@ -115,12 +115,20 @@
             </ul>
             <hr/>
             <div class="mb-2">
+                <select id="filterKec" class="form-select mb-2">
+                    <option value="">Semua Kecamatan</option>
+                    <?php if (isset($kecamatan_list)): ?>
+                        <?php foreach($kecamatan_list as $k): ?>
+                            <option value="<?= htmlspecialchars($k['id']) ?>"><?= htmlspecialchars($k['name']) ?></option>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </select>
                 <select id="filterKel" class="form-select">
                     <option value="">Semua Kelurahan</option>
                     <?php foreach($kelurahan_list as $k): ?>
                         <?php if (property_exists($k, 'id') && is_numeric($k->id)): ?>
                             <!-- Ini adalah file KML -->
-                            <option value="<?= htmlspecialchars($k->id) ?>">[KML] <?= htmlspecialchars($k->kelurahan) ?></option>
+                            <option value="<?= htmlspecialchars($k->id) ?>" data-kecamatan="<?= isset($k->kecamatan_id) ? htmlspecialchars($k->kecamatan_id) : '' ?>">[KML] <?= htmlspecialchars($k->kelurahan) ?></option>
                         <?php else: ?>
                             <!-- Ini adalah kelurahan biasa -->
                             <option value="<?= htmlspecialchars($k->kelurahan) ?>"><?= htmlspecialchars($k->kelurahan) ?></option>

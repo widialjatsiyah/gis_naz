@@ -21,16 +21,38 @@ class Map_model extends CI_Model {
         return array_merge($old_data, $kml_data);
     }
     
+    // Fungsi untuk mendapatkan data berdasarkan kecamatan
+    public function get_by_kecamatan($kecamatan_id) {
+        // Dapatkan data dari tabel kml_data_detail yang terkait dengan kecamatan
+        $this->db->select("kd.*, kh.kecamatan_id");
+        $this->db->from("{$this->kml_detail_table} kd");
+        $this->db->join("{$this->kml_head_table} kh", "kd.head_id = kh.id");
+        $this->db->where("kh.kecamatan_id", $kecamatan_id);
+        $this->db->order_by('kd.id', 'ASC');
+        $kml_data = $this->db->get()->result();
+        
+        // Untuk data lama (geojson_data), kita tidak memiliki informasi kecamatan
+        // Jadi hanya menampilkan data KML yang terkait dengan kecamatan
+        
+        return $kml_data;
+    }
+    
     public function kelurahan_list(){ 
         // Dapatkan daftar kelurahan dari tabel geojson_data (data lama)
       
         // Dapatkan daftar file KML dari tabel kml_data_head (data baru)
-        $this->db->select('id, name as kelurahan')->from($this->kml_head_table); 
+        $this->db->select('id, name as kelurahan, kecamatan_id')->from($this->kml_head_table); 
         $this->db->order_by('name', 'ASC'); 
         $kml_files = $this->db->get()->result();
         
         // Gabungkan data
         return $kml_files;
+    }
+    
+    // Fungsi untuk mendapatkan daftar kecamatan
+    public function kecamatan_list() {
+        $this->load->model('Kml_model');
+        return $this->Kml_model->get_all_kecamatan();
     }
     
     // Fungsi untuk mendapatkan detail data KML berdasarkan ID file
