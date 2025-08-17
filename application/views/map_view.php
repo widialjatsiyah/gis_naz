@@ -733,13 +733,10 @@
                                         l.labels.push(label);
                                     }
 
-                                    // Hanya tambahkan popup dan event untuk admin
-                                    <?php if (isset($user) && is_admin()): ?>
                                         // Tambahkan event klik untuk menampilkan detail
                                         l.on('click', function(e) {
                                             showPolygonDetail(r.id, l.feature.properties, l);
                                         });
-                                    <?php endif; ?>
                                 });
 
                                 layer.addTo(group);
