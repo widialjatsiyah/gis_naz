@@ -223,24 +223,37 @@
         // Filter kelurahan berdasarkan kecamatan yang dipilih
         $('#filterKec').on('change', function() {
             var kecId = $(this).val();
-            $('#filterKel option').show();
-
+            
+            // Reset dropdown kelurahan
+            $('#filterKel').empty();
+            
+            // Tambahkan opsi default
+            $('#filterKel').append(new Option("Semua Kelurahan", "", false, false));
+            
             if (kecId) {
-                $('#filterKel option[data-kecamatan]').each(function() {
+                // Filter kelurahan berdasarkan kecamatan yang dipilih
+                $('#filterKelContainer option[data-kecamatan]').each(function() {
                     var optionKecId = $(this).data('kecamatan');
-                    if (optionKecId != kecId) {
-                        $(this).hide();
+                    if (optionKecId == kecId) {
+                        $('#filterKel').append($(this).clone());
+                    }
+                });
+            } else {
+                // Jika tidak ada kecamatan yang dipilih, tampilkan semua kelurahan
+                $('#filterKelContainer option').each(function() {
+                    if ($(this).val() !== "") {
+                        $('#filterKel').append($(this).clone());
                     }
                 });
             }
-
-            // Reset kelurahan selection
-            $('#filterKel').val('');
-
+            
+            // Trigger change event untuk Select2
+            // $('#filterKel').trigger('change');
+            
             // Load data
-            loadData();
+            // loadData();
         });
-
+        
         // Reload data when filter changes
         $('#filterKel').on('change', loadData);
 

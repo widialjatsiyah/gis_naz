@@ -49,6 +49,11 @@
             position: absolute;
             inset: 0
         }
+        
+        /* Hidden container for storing original options */
+        #filterKelContainer {
+            display: none;
+        }
     </style>
     <!-- Memuat library Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -121,7 +126,7 @@
                 <h6>Filter</h6>
                 <div class="form-group">
                     <label for="filterKec">Kecamatan</label>
-                     <select id="filterKec" class="form-select mb-2 select2-filter">
+                      <select id="filterKec" class="form-select mb-2 select2-filter">
                     <option value="">Semua Kecamatan</option>
                     <?php if (isset($kecamatan_list)): ?>
                         <?php foreach($kecamatan_list as $k): ?>
@@ -130,8 +135,9 @@
                     <?php endif; ?>
                 </select>
                 </div>
-               <div class="form-group">
+                <div class="form-group">
                     <label for="filterKel">Kelurahan</label>
+                    
                 <select id="filterKel" class="form-select select2-filter">
                     <option value="">Semua Kelurahan</option>
                     <?php foreach($kelurahan_list as $k): ?>
@@ -144,7 +150,21 @@
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </select>
-               </div>
+                </div>
+              
+                
+                <!-- Hidden container for storing original options -->
+                <div id="filterKelContainer" style="display: none;">
+                    <?php foreach($kelurahan_list as $k): ?>
+                        <?php if (property_exists($k, 'id') && is_numeric($k->id)): ?>
+                            <!-- Ini adalah file KML -->
+                            <option value="<?= htmlspecialchars($k->id) ?>" data-kecamatan="<?= isset($k->kecamatan_id) ? htmlspecialchars($k->kecamatan_id) : '' ?>">[KML] <?= htmlspecialchars($k->kelurahan) ?></option>
+                        <?php else: ?>
+                            <!-- Ini adalah kelurahan biasa -->
+                            <option value="<?= htmlspecialchars($k->kelurahan) ?>"><?= htmlspecialchars($k->kelurahan) ?></option>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </div>
         <div class="content">
