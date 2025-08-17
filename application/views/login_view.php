@@ -14,7 +14,7 @@
             <div class="mb-2"><input class="form-control" name="username" placeholder="Username" required></div>
             <div class="mb-2"><input class="form-control" name="password" type="password" placeholder="Password" required></div><button class="btn btn-primary w-100">Login</button>
         </form>
-        <div class="mt-3 text-muted small">Default: admin/admin123, viewer/admin123</div>
+        <!-- <div class="mt-3 text-muted small">Default: admin/admin123, viewer/admin123</div> -->
     </div>
 </body>
 
