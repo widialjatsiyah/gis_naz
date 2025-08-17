@@ -61,9 +61,9 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
     <!-- Memuat library Leaflet.draw jika diperlukan -->
-    <?php if (isset($load_leaflet_draw) && $load_leaflet_draw): ?>
+    <?php // if (isset($load_leaflet_draw) && $load_leaflet_draw): ?>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    <?php endif; ?>
+    <?php // endif; ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const toggleButton = document.getElementById('toggleSidebar');
