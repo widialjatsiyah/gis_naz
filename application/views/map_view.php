@@ -293,7 +293,7 @@
                             color: '#0000CC',
                             weight: 2,
                             opacity: 1,
-                            fillColor: '#99def5ff',
+                            fillColor: '#0000CC',
                             fillOpacity: 0.1
                         };
                     },
