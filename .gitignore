@@ -31,5 +31,6 @@ user_guide_src/cilexer/pycilexer.egg-info/*
 .htaccess
 /tests/tests/
 /tests/results/
-/public/*
+# /public/*
+/public/data/uploads/*
 /application/config/database.php

@@ -24,8 +24,14 @@ class Map extends CI_Controller {
     public function data(){ 
         $kel = $this->input->get('kelurahan', TRUE);
         $kec = $this->input->get('kecamatan', TRUE);
+        $polygon_id = $this->input->get('polygon_id', TRUE);
         
-        if ($kec) {
+        if ($polygon_id) {
+            // Jika ada ID polygon spesifik
+            $rows = $this->mm->get_polygon_by_id($polygon_id);
+            // Kembalikan dalam format array
+            $rows = $rows ? [$rows] : [];
+        } else if ($kec) {
             // Jika ada filter kecamatan
             $rows = $this->mm->get_by_kecamatan($kec);
         } else {
@@ -34,6 +40,35 @@ class Map extends CI_Controller {
         }
         
         return $this->output->set_content_type('application/json')->set_output(json_encode($rows));
+    }
+    
+    // Fungsi untuk mendukung pencarian polygon dengan Select2 (server-side)
+    public function search_polygon() {
+        $term = $this->input->get('term', TRUE);
+        $page = $this->input->get('page', TRUE) ?: 1;
+        $limit = 20;
+        $offset = ($page - 1) * $limit;
+        
+        // Dapatkan hasil pencarian dari model
+        $results = $this->mm->search_polygon($term, $limit, $offset);
+        $total_count = $this->mm->count_search_polygon($term);
+        
+        $data = [];
+        foreach ($results as $row) {
+            $data[] = [
+                'id' => $row->id,
+                'text' => $row->name 
+            ];
+        }
+        
+        return $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode([
+                'results' => $data,
+                'pagination' => [
+                    'more' => ($page * $limit) < $total_count
+                ]
+            ]));
     }
     
     // Fungsi baru untuk mendapatkan data KML berdasarkan ID file

@@ -37,6 +37,77 @@ class Map_model extends CI_Model {
         return $kml_data;
     }
     
+    // Fungsi untuk pencarian polygon (untuk Select2)
+    public function search_polygon($term = '', $limit = 20, $offset = 0) {
+        if (!empty($term)) {
+            $this->db->group_start();
+            $this->db->like('name', $term);
+            $this->db->or_like('kelurahan', $term);
+            $this->db->group_end();
+        }
+        
+        $this->db->order_by('name', 'ASC');
+        $this->db->limit($limit, $offset);
+        
+        // Dapatkan data dari tabel geojson_data
+        $old_data_query = $this->db->get($this->table);
+        $old_data = $old_data_query->result();
+        
+        // Reset query untuk pencarian berikutnya
+        $this->db->reset_query();
+        
+        if (!empty($term)) {
+            $this->db->group_start();
+            $this->db->like('kd.name', $term);
+            $this->db->or_like('kd.kelurahan', $term);
+            $this->db->group_end();
+        }
+        
+        $this->db->select("kd.*, kh.name as kelurahan_name");
+        $this->db->from("{$this->kml_detail_table} kd");
+        $this->db->join("{$this->kml_head_table} kh", "kd.head_id = kh.id", "left");
+        $this->db->order_by('kd.name', 'ASC');
+        $this->db->limit($limit, $offset);
+        
+        // Dapatkan data dari tabel kml_data_detail
+        $kml_data_query = $this->db->get();
+        $kml_data = $kml_data_query->result();
+        
+        // Gabungkan data
+        return array_merge($old_data, $kml_data);
+    }
+    
+    // Fungsi untuk menghitung total hasil pencarian polygon
+    public function count_search_polygon($term = '') {
+        if (!empty($term)) {
+            $this->db->group_start();
+            $this->db->like('name', $term);
+            $this->db->or_like('kelurahan', $term);
+            $this->db->group_end();
+        }
+        
+        // Hitung data dari tabel geojson_data
+        $old_data_count = $this->db->count_all_results($this->table, FALSE);
+        
+        // Reset query
+        $this->db->reset_query();
+        
+        if (!empty($term)) {
+            $this->db->group_start();
+            $this->db->like('kd.name', $term);
+            $this->db->or_like('kd.kelurahan', $term);
+            $this->db->group_end();
+        }
+        
+        $this->db->from("{$this->kml_detail_table} kd");
+        $this->db->join("{$this->kml_head_table} kh", "kd.head_id = kh.id", "left");
+        
+        // Hitung data dari tabel kml_data_detail
+        $kml_data_count = $this->db->count_all_results();
+        
+        return $old_data_count + $kml_data_count;
+    }
+    
     public function kelurahan_list(){ 
         // Dapatkan daftar kelurahan dari tabel geojson_data (data lama)
       
@@ -67,9 +138,27 @@ class Map_model extends CI_Model {
         return $this->db->insert($this->table, $data);
     }
     
-    // Fungsi untuk mengambil polygon berdasarkan ID
+    // Fungsi untuk mendapatkan polygon berdasarkan ID
     public function get_polygon_by_id($id) {
-        return $this->db->get_where($this->table, ['id' => $id])->row();
+        // Cari di tabel geojson_data terlebih dahulu
+        $this->db->where('id', $id);
+        $result = $this->db->get($this->table)->row();
+        
+        // Jika tidak ditemukan, cari di tabel kml_data_detail
+        if (!$result) {
+            $this->db->select("kd.*, kh.name as kelurahan_name");
+            $this->db->from("{$this->kml_detail_table} kd");
+            $this->db->join("{$this->kml_head_table} kh", "kd.head_id = kh.id", "left");
+            $this->db->where("kd.id", $id);
+            $result = $this->db->get()->row();
+            
+            // Sesuaikan nama field jika diperlukan
+            if ($result && isset($result->kelurahan_name)) {
+                $result->kelurahan = $result->kelurahan_name;
+            }
+        }
+        
+        return $result;
     }
     
     // Fungsi untuk mengupdate polygon

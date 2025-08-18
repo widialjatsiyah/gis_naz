@@ -86,6 +86,12 @@
     </div>
 </div>
 
+<!-- Tambahkan alert untuk pencarian -->
+<div class="alert alert-info" id="infoAlert" role="alert">
+    <i class="fas fa-info-circle"></i> 
+    <span id="infoMessage"></span>
+</div>
+
 <!-- Tombol Simpan Perubahan (awalnya disembunyikan) -->
 <div id="saveButtonContainer" style="position: absolute; top: 10px; right: 10px; z-index: 1000; display: none;">
     <button id="saveChangesBtn" class="btn btn-success">
@@ -96,6 +102,15 @@
 <style>
     #map {
         height: 100%;
+    }
+    
+    /* Gaya untuk alert pencarian */
+    #infoAlert {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        display: none;
     }
 
     .polygon-detail-modal {
@@ -170,6 +185,15 @@
     .polygon-label {
         font-size: 10px;
         color: #333;
+        font-weight: bold;
+        text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
+        z-index: 1000;
+        pointer-events: auto;
+    }
+    
+    .search-label {
+        z-index: 1001;
+        font-weight: bold;
     }
 </style>
 
@@ -183,6 +207,58 @@
             placeholder: "Pilih atau cari...",
             allowClear: true,
             width: '100%'
+        });
+        
+        // Inisialisasi Select2 untuk pencarian polygon
+        $('#searchPolygonSelect2').select2({
+            placeholder: "Cari polygon berdasarkan nama...",
+            allowClear: true,
+            width: '100%',
+            ajax: {
+                url: '<?= base_url("index.php/map/search_polygon") ?>',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        term: params.term, // kata kunci pencarian
+                        page: params.page || 1
+                    };
+                },
+                processResults: function (data, params) {
+                    params.page = params.page || 1;
+                    
+                    return {
+                        results: data.results,
+                        pagination: {
+                            more: data.pagination.more
+                        }
+                    };
+                },
+                cache: true
+            },
+            minimumInputLength: 1,
+            templateResult: function (data) {
+                if (data.loading) {
+                    return data.text;
+                }
+                
+                return $('<span>' + data.text + '</span>');
+            },
+            templateSelection: function (data) {
+                return data.text || data.name || 'Pilih atau cari polygon...';
+            }
+        });
+
+        // Event handler untuk pemilihan polygon dari Select2
+        $('#searchPolygonSelect2').on('select2:select', function (e) {
+            var data = e.params.data;
+            // console.log("Polygon selected:", data);
+            highlightPolygon(data.id);
+        });
+
+        // Event handler untuk menghapus pilihan polygon
+        $('#searchPolygonSelect2').on('select2:unselect', function (e) {
+            resetPolygonHighlight();
         });
 
         // Initialize the map
@@ -200,6 +276,38 @@
             attribution: '&copy; <a href="https://www.google.com/maps">Google Maps</a>'
         });
 
+        // Layer Kecamatan dari file KML
+        var kecamatanLayer = L.layerGroup();
+
+        // Memuat file KML kecamatan
+        fetch('<?= base_url('public/data/kecamata.kml') ?>')
+            .then(response => response.text())
+            .then(data => {
+                var parser = new DOMParser();
+                var kml = parser.parseFromString(data, 'text/xml');
+                var geojson = toGeoJSON.kml(kml);
+                
+                L.geoJSON(geojson, {
+                    style: function(feature) {
+                        return {
+                            color: '#0000CC',
+                            weight: 2,
+                            opacity: 1,
+                            fillColor: '#99def5ff',
+                            fillOpacity: 0.1
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        if (feature.properties.name) {
+                            layer.bindTooltip(feature.properties.name, {permanent: false, direction: 'center'});
+                        }
+                    }
+                }).addTo(kecamatanLayer);
+            })
+            .catch(error => {
+                console.error('Error loading KML file:', error);
+            });
+
         // Add default layer to map
         osmLayer.addTo(map);
 
@@ -210,10 +318,13 @@
         };
 
         var overlays = {
-            // Will be populated with data layers
+            "Batas Kecamatan": kecamatanLayer
         };
 
         L.control.layers(baseLayers, overlays).addTo(map);
+
+        // Tambahkan kecamatanLayer ke map agar terlihat secara default
+        kecamatanLayer.addTo(map);
 
         var group = new L.FeatureGroup().addTo(map);
         var layerMap = {}; // Untuk menyimpan referensi layer berdasarkan ID
@@ -256,6 +367,33 @@
         
         // Reload data when filter changes
         $('#filterKel').on('change', loadData);
+        
+        // Tambahkan event listener untuk memicu pencarian ketika dropdown berubah
+        $('#filterKec, #filterKel').on('change', function() {
+            var searchTerm = $('#searchPolygon').val();
+            if (searchTerm) {
+                // Beri jeda sebentar untuk memastikan data telah dimuat
+                setTimeout(function() {
+                    searchPolygon(searchTerm);
+                }, 100);
+            }
+        });
+
+        // Tambahkan event listener untuk pencarian polygon dengan debounce
+        var searchTimeout;
+        $('#searchPolygon').on('input', function() {
+            var searchTerm = $(this).val().toLowerCase();
+            
+            // Clear timeout sebelumnya
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            // Set timeout baru untuk delay pencarian
+            searchTimeout = setTimeout(function() {
+                searchPolygon(searchTerm);
+            }, 300); // Delay 300ms
+        });
 
         // Inisialisasi feature group untuk drawing
         var drawnItems = new L.FeatureGroup().addTo(map);
@@ -547,13 +685,14 @@
                             try {
                                 // Coba parse sebagai JSON dulu
                                 var parsedProps = JSON.parse(properties[key]);
+                                // console.log('Parsed properties:', parsedProps);
                                 propertiesHtml += '<div class="property-item">' +
-                                    '<div class="property-label">Properties</div>' +
                                     '<div class="property-value">';
 
                                 for (var propKey in parsedProps) {
-                                    propertiesHtml += '<div><strong>' + propKey + ':</strong> ' + (parsedProps[propKey] || '-') + '</div>';
+                                    propertiesHtml += '<div><strong>' + propKey + ':</strong> ' + (parsedProps[propKey] || '-') + '</div><br>';
                                 }
+                                // console.log(propertiesHtml);
 
                                 propertiesHtml += '</div></div>';
                             } catch (e) {
@@ -655,6 +794,186 @@
             }
         });
 
+        // Fungsi untuk menyorot polygon yang dipilih
+        function highlightPolygon(polygonId) {
+            // Pastikan layerMap dan map sudah terdefinisi
+            if (typeof layerMap === 'undefined' || typeof map === 'undefined') {
+                console.error('layerMap atau map belum terdefinisi');
+                return;
+            }
+            
+            // Reset semua polygon ke style awal
+            resetPolygonHighlight();
+            // console.log("Highlighting polygon with ID:", polygonId);
+            
+            // Temukan polygon berdasarkan ID
+            var layer = layerMap[polygonId];
+           
+                // Jika polygon tidak ditemukan di layer saat ini, ambil dari database
+               loadPolygonFromDatabase(polygonId);
+            
+        }
+        
+        // Fungsi untuk memuat polygon dari database
+        function loadPolygonFromDatabase(polygonId) {
+            $.ajax({
+                url: '<?= base_url("index.php/map/data") ?>',
+                type: 'GET',
+                data: { polygon_id: polygonId },
+                success: function(response) {
+                    if (response && response.length > 0) {
+                        var polygonData = response[0];
+
+                        try {
+                            if (polygonData.geometry) {
+                                var gj = JSON.parse(polygonData.geometry);
+                                var layer = L.geoJSON(gj, {
+                                    style: styleFor(polygonData.color)
+                                });
+
+                                // Tambahkan data ke layer
+                                layer.eachLayer(function(l) {
+                                    // Simpan warna asli
+                                    l.options.originalColor = polygonData.color || '#3388ff';
+
+                                    l.feature = {};
+                                    l.feature.properties = {
+                                        id: polygonData.id,
+                                        name: polygonData.name,
+                                        kelurahan: polygonData.kelurahan,
+                                        kecamatan_id: polygonData.kecamatan_id,
+                                        properties: polygonData.properties
+                                    };
+
+                                    // Simpan referensi layer
+                                    layerMap[polygonData.id] = l;
+
+                                    // Tambahkan ke group terlebih dahulu
+                                    l.addTo(group);
+                                    console.log("Added polygon with ID:", polygonData);
+                                    // Tambahkan label dengan 5 digit terakhir jika nama sesuai pola
+                                    var lastFiveDigits = extractLastFiveDigits(polygonData.name);
+                                    console.log("Last five digits extracted:", polygonData.name, lastFiveDigits);
+                                    if (lastFiveDigits) {
+                                        // Tunggu sampai layer benar-benar ditambahkan ke peta
+                                        setTimeout(function() {
+                                            try {
+                                                if (l.getBounds && l.getBounds().isValid && l.getBounds().isValid()) {
+                                                    var center = l.getBounds().getCenter();
+
+                                                    // Buat label di tengah poligon
+                                                    var label = L.marker(center, {
+                                                        icon: L.divIcon({
+                                                            className: 'polygon-label',
+                                                            html: '<div style="background: rgba(255, 255, 255, 0.9); padding: 2px 5px; border-radius: 3px; font-weight: bold; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.3);">' + lastFiveDigits + '</div>',
+                                                            iconSize: [50, 20]
+                                                        }),
+                                                        // Pastikan label muncul di atas semua layer lain
+                                                        zIndexOffset: 1000
+                                                    }).addTo(map);
+
+                                                    // Tambahkan event listener untuk menampilkan detail ketika label diklik
+                                                    label.on('click', function(e) {
+                                                        showPolygonDetail(polygonData.id, l.feature.properties, l);
+                                                    });
+
+                                                    // Simpan referensi label agar bisa dihapus nanti
+                                                    if (!l.labels) l.labels = [];
+                                                    l.labels.push(label);
+                                                }
+                                            } catch (e) {
+                                                console.error('Error creating label for polygon ' + polygonData.id + ':', e);
+                                            }
+                                        }, 10);
+                                    }
+
+                                    // Tambahkan event klik untuk menampilkan detail
+                                    l.on('click', function(e) {
+                                        showPolygonDetail(polygonData.id, l.feature.properties, l);
+                                    });
+
+                                    // Sorot polygon yang baru dimuat dengan warna asli dari database
+                                    l.setStyle({
+                                        fillOpacity: 0.6,
+                                        weight: 4,
+                                        color: polygonData.color || '#3388ff'
+                                    });
+
+                                    // Fokuskan peta ke polygon yang dipilih
+                                    setTimeout(function() {
+                                        try {
+                                            var bounds = l.getBounds();
+                                            if (bounds.isValid()) {
+                                                map.fitBounds(bounds, {
+                                                    padding: [50, 50],
+                                                    maxZoom: 18
+                                                });
+                                            }
+                                        } catch (e) {
+                                            console.error('Error focusing on polygon:', e);
+                                        }
+                                    }, 50);
+
+                                    // Simpan referensi polygon yang sedang disorot
+                                    window.highlightedPolygon = polygonData.id;
+                                    
+                                    // Pastikan polygon muncul di atas layer kecamatan
+                                    map.panTo(l.getBounds().getCenter());
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Error parsing geometry for item:', polygonData, e);
+                            showErrorAlert('Gagal memuat polygon: ' + e.message);
+                        }
+                    } else {
+                        showErrorAlert('Polygon tidak ditemukan di database');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to load polygon from database:", status, error);
+                    showErrorAlert("Gagal memuat polygon dari database: " + error);
+                }
+            });
+        }
+        
+        // Fungsi untuk mereset sorotan polygon
+        function resetPolygonHighlight() {
+            group.eachLayer(function(layer) {
+                // Kembalikan style ke default
+                if (layer.options.originalColor) {
+                    layer.setStyle({
+                        fillOpacity: 0.2,
+                        weight: 2,
+                        color: layer.options.originalColor
+                    });
+                } else {
+                    layer.setStyle({
+                        fillOpacity: 0.2,
+                        weight: 2,
+                        color: layer.options.color || '#3388ff'
+                    });
+                }
+                
+                // Hapus label pencarian yang mungkin ada
+                if (layer.searchLabel) {
+                    if (map.hasLayer(layer.searchLabel)) {
+                        map.removeLayer(layer.searchLabel);
+                    }
+                    // Hapus juga dari array labels jika ada
+                    if (layer.labels) {
+                        var index = layer.labels.indexOf(layer.searchLabel);
+                        if (index > -1) {
+                            layer.labels.splice(index, 1);
+                        }
+                    }
+                    delete layer.searchLabel;
+                }
+            });
+            
+            // Hapus referensi polygon yang disorot
+            window.highlightedPolygon = null;
+        }
+        
         // Fungsi untuk memuat data polygon
         function loadData() {
             group.clearLayers();
@@ -700,17 +1019,22 @@
 
                                 // Tambahkan data ke layer
                                 layer.eachLayer(function(l) {
+                                    // Simpan warna asli
+                                    l.options.originalColor = r.color || '#3388ff';
+                                    
                                     l.feature = {};
                                     l.feature.properties = {
                                         id: r.id,
                                         name: r.name,
-                                        // kelurahan: r.kelurahan,
+                                        kelurahan: r.kelurahan,
+                                        kecamatan_id: r.kecamatan_id,
                                         properties: r.properties
                                     };
 
                                     // Simpan referensi layer
                                     layerMap[r.id] = l;
 
+                                    // console.log("Added polygon with ID:", r.id);
                                     // Tambahkan label dengan 5 digit terakhir jika nama sesuai pola
                                     var lastFiveDigits = extractLastFiveDigits(r.name);
                                     if (lastFiveDigits) {
@@ -733,10 +1057,10 @@
                                         l.labels.push(label);
                                     }
 
-                                        // Tambahkan event klik untuk menampilkan detail
-                                        l.on('click', function(e) {
-                                            showPolygonDetail(r.id, l.feature.properties, l);
-                                        });
+                                    // Tambahkan event klik untuk menampilkan detail
+                                    l.on('click', function(e) {
+                                        showPolygonDetail(r.id, l.feature.properties, l);
+                                    });
                                 });
 
                                 layer.addTo(group);
@@ -749,11 +1073,194 @@
                     if (group.getBounds().isValid()) {
                         map.fitBounds(group.getBounds());
                     }
+                    
+                    // Terapkan pencarian yang sedang aktif setelah data dimuat
+                    var searchTerm = $('#searchPolygon').val();
+                    if (searchTerm) {
+                        searchPolygon(searchTerm);
+                    }
                 }
             }).fail(function(jqxhr, textStatus, error) {
                 console.error("Failed to load data:", textStatus, error);
                 showErrorAlert("Gagal memuat data peta: " + textStatus);
             });
+        }
+
+        // Fungsi untuk mencari polygon berdasarkan nama
+        function searchPolygon(searchTerm) {
+            // Reset warna semua polygon ke warna asli
+            group.eachLayer(function(layer) {
+                // Simpan warna asli jika belum ada
+                if (!layer.options.originalColor && layer.options.color) {
+                    layer.options.originalColor = layer.options.color;
+                }
+                
+                // Kembalikan style ke default
+                layer.setStyle({
+                    fillOpacity: 0.2,
+                    weight: 2,
+                    color: layer.options.originalColor || '#3388ff'
+                });
+                
+                // Hapus label pencarian yang mungkin ada
+                if (layer.searchLabel) {
+                    if (map.hasLayer(layer.searchLabel)) {
+                        map.removeLayer(layer.searchLabel);
+                    }
+                    delete layer.searchLabel;
+                }
+            });
+
+            // Jika tidak ada kata kunci pencarian, hanya reset tampilan tanpa zoom
+            if (!searchTerm) return;
+
+            // Dapatkan nilai filter yang dipilih
+            var selectedKelurahan = $('#filterKel').val();
+            var selectedKecamatan = $('#filterKec').val();
+
+            // Cari polygon yang sesuai dengan kata kunci
+            var foundLayers = [];
+            searchTerm = searchTerm.toLowerCase();
+            
+            group.eachLayer(function(layer) {
+                // Pastikan layer memiliki feature dan properties
+                if (layer.feature?.properties?.name) {
+                    var name = layer.feature.properties.name.toString().toLowerCase();
+                    
+                    // Periksa apakah nama mengandung kata kunci pencarian
+                    if (name.includes(searchTerm)) {
+                        // Jika ada filter kelurahan, hanya tampilkan polygon dari kelurahan yang dipilih
+                        if (selectedKelurahan && layer.feature.properties.kelurahan) {
+                            // Untuk kelurahan biasa
+                            if (layer.feature.properties.kelurahan === selectedKelurahan) {
+                                // Sorot polygon yang ditemukan dengan warna asli dari database
+                                layer.setStyle({
+                                    fillOpacity: 0.6,
+                                    weight: 4,
+                                    color: layer.options.originalColor || '#3388ff'
+                                });
+                                
+                                // Simpan layer yang ditemukan
+                                foundLayers.push(layer);
+                            }
+                        } 
+                        // Jika ada filter kecamatan, hanya tampilkan polygon dari kecamatan yang dipilih
+                        else if (selectedKecamatan && layer.feature.properties.kecamatan_id) {
+                            if (layer.feature.properties.kecamatan_id == selectedKecamatan) {
+                                // Sorot polygon yang ditemukan dengan warna asli dari database
+                                layer.setStyle({
+                                    fillOpacity: 0.6,
+                                    weight: 4,
+                                    color: layer.options.originalColor || '#3388ff'
+                                });
+                                
+                                // Simpan layer yang ditemukan
+                                foundLayers.push(layer);
+                            }
+                        }
+                        // Jika tidak ada filter, tampilkan semua polygon yang cocok
+                        else if (!selectedKelurahan && !selectedKecamatan) {
+                            // Sorot polygon yang ditemukan dengan warna asli dari database
+                            layer.setStyle({
+                                fillOpacity: 0.6,
+                                weight: 4,
+                                color: layer.options.originalColor || '#3388ff'
+                            });
+                            
+                            // Simpan layer yang ditemukan
+                            foundLayers.push(layer);
+                        }
+                    }
+                }
+            });
+
+            // Jika ditemukan polygon, fokuskan ke polygon yang ditemukan
+            if (foundLayers.length > 0) {
+                // Tambahkan label untuk hasil pencarian
+                setTimeout(function() {
+                    foundLayers.forEach(function(layer) {
+                        // Hapus label pencarian yang sudah ada
+                        if (layer.searchLabel) {
+                            if (map.hasLayer(layer.searchLabel)) {
+                                map.removeLayer(layer.searchLabel);
+                            }
+                            // Hapus juga dari array labels jika ada
+                            if (layer.labels) {
+                                var index = layer.labels.indexOf(layer.searchLabel);
+                                if (index > -1) {
+                                    layer.labels.splice(index, 1);
+                                }
+                            }
+                            delete layer.searchLabel;
+                        }
+                        
+                        // Buat label baru dengan 5 digit terakhir dari nama
+                        var name = layer.feature.properties.name;
+                        var labelContent = extractLastFiveDigits(name);
+                        
+                        if (labelContent) {
+                            // Gunakan pendekatan yang lebih konsisten dengan loadData
+                            setTimeout(function() {
+                                try {
+                                    if (layer.getBounds && layer.getBounds().isValid && layer.getBounds().isValid()) {
+                                        // Buat label di tengah poligon dengan styling yang konsisten
+                                        var searchLabel = L.marker(layer.getBounds().getCenter(), {
+                                            icon: L.divIcon({
+                                                className: 'polygon-label',
+                                                html: '<div style="background: rgba(255, 255, 255, 0.8); padding: 2px 5px; border-radius: 3px; font-weight: bold; text-align: center;">' + labelContent + '</div>',
+                                                iconSize: [50, 20]
+                                            }),
+                                            // Pastikan label muncul di atas semua layer lain
+                                            zIndexOffset: 1000
+                                        }).addTo(map);
+                                        
+                                        // Tambahkan event listener untuk menampilkan detail ketika label diklik
+                                        searchLabel.on('click', function(e) {
+                                            showPolygonDetail(layer.feature.properties.id, layer.feature.properties, layer);
+                                        });
+                                        
+                                        // Simpan referensi label agar bisa dihapus nanti
+                                        if (!layer.labels) layer.labels = [];
+                                        layer.labels.push(searchLabel);
+                                        
+                                        // Simpan juga sebagai searchLabel untuk manajemen khusus
+                                        layer.searchLabel = searchLabel;
+                                        
+                                        // Pastikan label muncul di atas layer kecamatan
+                                        map.panTo(layer.getBounds().getCenter());
+                                    }
+                                } catch(e) {
+                                    console.error('Error creating search label:', e);
+                                }
+                            }, 10);
+                        }
+                    });
+                }, 100);
+                
+                var groupBounds = new L.featureGroup(foundLayers).getBounds();
+                if (groupBounds.isValid()) {
+                    map.fitBounds(groupBounds, { 
+                        padding: [50, 50],
+                        maxZoom: 18,
+                        duration: 0.5
+                    });
+                }
+                
+                // Tampilkan pesan jumlah hasil yang ditemukan
+                showInfoAlert('Ditemukan ' + foundLayers.length + ' polygon');
+            } else if (searchTerm) {
+                // Jika tidak ada hasil pencarian
+                showInfoAlert('Tidak ditemukan polygon dengan nama "' + searchTerm + '"');
+            }
+        }
+        
+        // Fungsi tambahan untuk menampilkan alert info
+        function showInfoAlert(message) {
+            $('#infoMessage').text(message);
+            $('#infoAlert').show();
+            setTimeout(function() {
+                $('#infoAlert').hide();
+            }, 3000);
         }
 
         // Fungsi global untuk edit polygon (hanya untuk admin)
@@ -855,9 +1362,25 @@
         function extractLastFiveDigits(name) {
             // Cek apakah nama memiliki format seperti 210200300101005380 (hanya angka)
             if (name && /^\d+$/.test(name) && name.length >= 5) {
+                console.log("Extracting last five digits from:", name);
                 // Ambil 5 digit terakhir
-                return name.slice(-5);
+                var hasil = name.slice(-5);
+                console.log("hasil:", hasil);
+                return hasil;
             }
+            
+            // Handle format seperti "210200500800305550 / ACHAMAD RAHMADI" atau "210200500800305550"
+            if (name) {
+                // Ekstrak bagian angka di awal string (asumsi format: angka diikuti oleh spasi dan karakter lain)
+                var match = name.match(/^(\d+)/);
+                if (match && match[1].length >= 5) {
+                    var numberPart = match[1];
+                    var hasil = numberPart.slice(-5);
+                    console.log("Extracted from complex format:", name, "=>", hasil);
+                    return hasil;
+                }
+            }
+            
             return null;
         }
 

@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="<?=base_url('/public/assets/togeojson.js')?>"></script>
     <style>
         body {
             height: 100vh;
@@ -151,7 +152,15 @@
                     <?php endforeach; ?>
                 </select>
                 </div>
-              
+                
+                <hr>
+                <!-- Tambahkan input pencarian polygon Select2 -->
+                <div class="form-group">
+                    <label for="searchPolygonSelect2">Cari Nama / No Objek</label>
+                    <select id="searchPolygonSelect2" class="form-select select2-filter" style="width: 100%;">
+                        <option value="">Pilih atau cari ...</option>
+                    </select>
+                </div>
                 
                 <!-- Hidden container for storing original options -->
                 <div id="filterKelContainer" style="display: none;">
