@@ -477,7 +477,7 @@
             // console.log("Is numeric:", !isNaN(parseInt(selectedValue)));
             
             if (selectedValue && !isNaN(parseInt(selectedValue)) && selectedValue.trim() !== '') {
-                console.log("Loading categories for KML file");
+                // console.log("Loading categories for KML file");
                 // Muat kategori untuk file KML yang dipilih
                 loadCategoryCheckboxes(selectedValue);
             }
@@ -1004,7 +1004,8 @@
                             layer.setStyle({
                                 fillOpacity: 0.7,
                                 weight: 4,
-                                color: originalColor
+                                color: 'red', // Set border color to red for target polygon
+                                fillColor: originalColor // Keep the fill color as original
                             });
                         }
                     }
@@ -1037,9 +1038,12 @@
                                 var bounds = targetLayer.getBounds();
                                 if (bounds.isValid()) {
                                     map.flyToBounds(bounds, {
-                                        padding: [30, 30],
-                                        maxZoom: 19
+                                        padding: [5, 5],   // Even smaller padding for closer view
+                                        maxZoom: 22        // Increased maxZoom for even closer view
                                     });
+                                    
+                                    // Tampilkan detail polygon target
+                                    showPolygonDetail(targetPolygonId, targetLayer.feature.properties, targetLayer);
                                 }
                             } catch (e) {
                                 console.error('Error focusing on target polygon:', e);
@@ -1084,7 +1088,7 @@
                                             kelurahan: polygonData.kelurahan,
                                             kecamatan_id: polygonData.kecamatan_id,
                                             properties: polygonData.properties,
-                                            head_id: polygonData.head_id // 添加 head_id 属性
+                                            head_id: polygonData.head_id
                                         };
 
                                         // 保存 layer 引用
@@ -1136,13 +1140,13 @@
                                             l.setStyle({
                                                 fillOpacity: 0.6,
                                                 weight: 5,
-                                                color: '#FF0000'
+                                                color: polygonData.color || '#3388ff'
                                             });
                                         } else {
                                             l.setStyle({
                                                 fillOpacity: 0.4,
                                                 weight: 3,
-                                                color: '#FFA500'
+                                                color: polygonData.color || '#FFA500'
                                             });
                                         }
                                     });
@@ -1153,7 +1157,7 @@
                             }
                         });
 
-                        // 调整地图视图以展示所有相关多边形
+                        
                         var relatedLayers = [];
                         group.eachLayer(function(layer) {
                             if (layer.feature && layer.feature.properties && layer.feature.properties.head_id == headId) {
@@ -1169,6 +1173,28 @@
                                     maxZoom: 18
                                 });
                             }
+                            
+                            // Fokuskan ke target polygon
+                            var targetLayer = layerMap[targetPolygonId];
+                            if (targetLayer) {
+                                setTimeout(function() {
+                                    try {
+                                        var bounds = targetLayer.getBounds();
+                                        if (bounds.isValid()) {
+                                            map.flyToBounds(bounds, {
+                                                padding: [30, 30],
+                                                maxZoom: 25
+                                            });
+                                            // console.log(';zoom');
+                                            
+                                            // Tampilkan detail polygon target
+                                            showPolygonDetail(targetPolygonId, targetLayer.feature.properties, targetLayer);
+                                        }
+                                    } catch (e) {
+                                        console.error('Error focusing on target polygon:', e);
+                                    }
+                                }, 300);
+                            }
                         }
                     } else {
                         showErrorAlert('未找到具有相同 head_id 的多边形');
@@ -1179,25 +1205,6 @@
                     showErrorAlert("根据 head_id 加载多边形时失败: " + error);
                 }
             });
-        }
-
-        // Fungsi untuk memuat data untuk kelurahan tertentu
-        function loadDataForKelurahan(kelurahan, callback) {
-            // Simpan filter saat ini
-            var currentKelFilter = $('#filterKel').val();
-            var currentKecFilter = $('#filterKec').val();
-            
-            // Set filter kelurahan
-            $('#filterKel').val(kelurahan);
-            
-            // Muat data
-            loadData();
-            
-            // Kembalikan filter setelah selesai (jika diperlukan)
-            if (callback) {
-                // Tunggu sebentar untuk memastikan data dimuat
-                setTimeout(callback, 500);
-            }
         }
         
         // Fungsi aktual untuk menyorot polygon
@@ -1213,7 +1220,8 @@
                 layer.setStyle({
                     fillOpacity: 0.6,
                     weight: 4,
-                    color: layer.options.originalColor || '#3388ff'
+                    color: 'red', // Set border color to red for target polygon
+                    fillColor: layer.options.originalColor || '#3388ff' // Keep the fill color as original
                 });
                 
                 // Fokuskan peta ke polygon yang dipilih
@@ -1222,9 +1230,12 @@
                         var bounds = layer.getBounds();
                         if (bounds.isValid()) {
                             map.fitBounds(bounds, {
-                                padding: [50, 50],
-                                maxZoom: 18
+                                padding: [5, 5],
+                                maxZoom: 25
                             });
+                            
+                            // Tampilkan detail polygon
+                            showPolygonDetail(polygonId, layer.feature.properties, layer);
                         }
                     } catch (e) {
                         console.error('Error focusing on polygon:', e);
@@ -1325,128 +1336,12 @@
                                             var bounds = l.getBounds();
                                             if (bounds.isValid()) {
                                                 map.fitBounds(bounds, {
-                                                    padding: [50, 50],
-                                                    maxZoom: 18
+                                                    padding: [5, 5],
+                                                    maxZoom: 25
                                                 });
-                                            }
-                                        } catch (e) {
-                                            console.error('Error focusing on polygon:', e);
-                                        }
-                                    }, 50);
-
-                                    // Simpan referensi polygon yang sedang disorot
-                                    window.highlightedPolygon = polygonData.id;
-                                });
-                            }
-                        } catch (e) {
-                            console.error('Error parsing geometry for item:', polygonData, e);
-                            showErrorAlert('Gagal memuat polygon: ' + e.message);
-                        }
-                    } else {
-                        showErrorAlert('Polygon tidak ditemukan di database');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error("Failed to load polygon from database:", status, error);
-                    showErrorAlert("Gagal memuat polygon dari database: " + error);
-                }
-            });
-        }
-        
-        // Fungsi aktual untuk memuat polygon dari database
-        function actualLoadPolygon(polygonId) {
-            $.ajax({
-                url: '<?= base_url("index.php/map/data") ?>',
-                type: 'GET',
-                data: { polygon_id: polygonId },
-                success: function(response) {
-                    if (response && response.length > 0) {
-                        var polygonData = response[0];
-
-                        try {
-                            if (polygonData.geometry) {
-                                var gj = JSON.parse(polygonData.geometry);
-                                var layer = L.geoJSON(gj, {
-                                    style: styleFor(polygonData.color)
-                                });
-
-                                // Tambahkan data ke layer
-                                layer.eachLayer(function(l) {
-                                    // Simpan warna asli
-                                    l.options.originalColor = polygonData.color || '#3388ff';
-
-                                    l.feature = {};
-                                    l.feature.properties = {
-                                        id: polygonData.id,
-                                        name: polygonData.name,
-                                        kelurahan: polygonData.kelurahan,
-                                        kecamatan_id: polygonData.kecamatan_id,
-                                        properties: polygonData.properties
-                                    };
-
-                                    // Simpan referensi layer
-                                    layerMap[polygonData.id] = l;
-
-                                    // Tambahkan ke group terlebih dahulu
-                                    l.addTo(group);
-                                    // console.log("Added polygon with ID:", polygonData);
-                                    // Tambahkan label dengan 5 digit terakhir jika nama sesuai pola
-                                    var lastFiveDigits = extractLastFiveDigits(polygonData.name);
-                                    // console.log("Last five digits extracted:", polygonData.name, lastFiveDigits);
-                                    if (lastFiveDigits) {
-                                        // Tunggu sampai layer benar-benar ditambahkan ke peta
-                                        setTimeout(function() {
-                                            try {
-                                                if (l.getBounds && l.getBounds().isValid && l.getBounds().isValid()) {
-                                                    var center = l.getBounds().getCenter();
-
-                                                    // Buat label di tengah poligon
-                                                    var label = L.marker(center, {
-                                                        icon: L.divIcon({
-                                                            className: 'polygon-label',
-                                                            html: '<div style="background: rgba(255, 255, 255, 0.9); padding: 2px 5px; border-radius: 3px; font-weight: bold; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.3);">' + lastFiveDigits + '</div>',
-                                                            iconSize: [50, 20]
-                                                        }),
-                                                        // Pastikan label muncul di atas semua layer lain
-                                                        zIndexOffset: 1000
-                                                    }).addTo(map);
-
-                                                    // Tambahkan event listener untuk menampilkan detail ketika label diklik
-                                                    label.on('click', function(e) {
-                                                        showPolygonDetail(polygonData.id, l.feature.properties, l);
-                                                    });
-
-                                                    // Simpan referensi label agar bisa dihapus nanti
-                                                    if (!l.labels) l.labels = [];
-                                                    l.labels.push(label);
-                                                }
-                                            } catch (e) {
-                                                console.error('Error creating label for polygon ' + polygonData.id + ':', e);
-                                            }
-                                        }, 10);
-                                    }
-
-                                    // Tambahkan event klik untuk menampilkan detail
-                                    l.on('click', function(e) {
-                                        showPolygonDetail(polygonData.id, l.feature.properties, l);
-                                    });
-
-                                    // Sorot polygon yang baru dimuat dengan warna asli dari database
-                                    l.setStyle({
-                                        fillOpacity: 0.6,
-                                        weight: 4,
-                                        color: polygonData.color || '#3388ff'
-                                    });
-
-                                    // Fokuskan peta ke polygon yang dipilih
-                                    setTimeout(function() {
-                                        try {
-                                            var bounds = l.getBounds();
-                                            if (bounds.isValid()) {
-                                                map.fitBounds(bounds, {
-                                                    padding: [50, 50],
-                                                    maxZoom: 18
-                                                });
+                                                // console.log('zoom2');
+                                                // Tampilkan detail polygon
+                                                showPolygonDetail(polygonData.id, l.feature.properties, l);
                                             }
                                         } catch (e) {
                                             console.error('Error focusing on polygon:', e);
@@ -1565,7 +1460,14 @@
                             if (r.geometry) {
                                 var gj = JSON.parse(r.geometry);
                                 var layer = L.geoJSON(gj, {
-                                    style: styleFor(r.color)
+                                    style: function(feature) {
+                                        return {
+                                            fillColor: r.color || '#3388ff', // Use database color for fill
+                                            fillOpacity: 0.2,
+                                            weight: 2,
+                                            color: r.color || '#3388ff' // Use database color for border
+                                        };
+                                    }
                                 });
 
                                 // Tambahkan data ke layer
@@ -1913,10 +1815,10 @@
         function extractLastFiveDigits(name) {
             // Cek apakah nama memiliki format seperti 210200300101005380 (hanya angka)
             if (name && /^\d+$/.test(name) && name.length >= 5) {
-                console.log("Extracting last five digits from:", name);
+                // console.log("Extracting last five digits from:", name);
                 // Ambil 5 digit terakhir
                 var hasil = name.slice(-5);
-                console.log("hasil:", hasil);
+                // console.log("hasil:", hasil);
                 return hasil;
             }
             
@@ -1927,7 +1829,7 @@
                 if (match && match[1].length >= 5) {
                     var numberPart = match[1];
                     var hasil = numberPart.slice(-5);
-                    console.log("Extracted from complex format:", name, "=>", hasil);
+                    // console.log("Extracted from complex format:", name, "=>", hasil);
                     return hasil;
                 }
             }
