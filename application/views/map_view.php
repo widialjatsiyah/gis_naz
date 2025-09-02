@@ -1060,7 +1060,7 @@
             }
         }
 
-        // 新增函数：根据 head_id 从数据库加载多边形
+        // Fungsi baru: Memuat polygon dari database berdasarkan head_id
         function loadPolygonsFromDatabaseByHeadId(headId, targetPolygonId) {
             $.ajax({
                 url: '<?= base_url("index.php/map/data_by_head_id") ?>',
@@ -1076,9 +1076,9 @@
                                         style: styleFor(polygonData.color)
                                     });
 
-                                    // 添加数据到 layer
+                                    // Menambahkan data ke layer
                                     layer.eachLayer(function(l) {
-                                        // 保存原始颜色
+                                        // Menyimpan warna asli
                                         l.options.originalColor = polygonData.color || '#3388ff';
 
                                         l.feature = {};
@@ -1091,13 +1091,13 @@
                                             head_id: polygonData.head_id
                                         };
 
-                                        // 保存 layer 引用
+                                        // Menyimpan referensi layer
                                         layerMap[polygonData.id] = l;
 
-                                        // 添加到 group
+                                        // Menambahkan ke grup
                                         l.addTo(group);
 
-                                        // 添加标签（如果有）
+                                        // Menambahkan label (jika ada)
                                         var lastFiveDigits = extractLastFiveDigits(polygonData.name);
                                         if (lastFiveDigits) {
                                             setTimeout(function() {
@@ -1105,7 +1105,7 @@
                                                     if (l.getBounds && l.getBounds().isValid && l.getBounds().isValid()) {
                                                         var center = l.getBounds().getCenter();
 
-                                                        // 创建标签
+                                                        // Membuat label
                                                         var label = L.marker(center, {
                                                             icon: L.divIcon({
                                                                 className: 'polygon-label',
@@ -1115,22 +1115,22 @@
                                                             zIndexOffset: 1000
                                                         }).addTo(map);
 
-                                                        // 添加点击事件以显示详情
+                                                        // Menambahkan event klik untuk menampilkan detail
                                                         label.on('click', function(e) {
                                                             showPolygonDetail(polygonData.id, l.feature.properties, l);
                                                         });
 
-                                                        // 保存标签引用
+                                                        // Menyimpan referensi label
                                                         if (!l.labels) l.labels = [];
                                                         l.labels.push(label);
                                                     }
                                                 } catch (e) {
-                                                    console.error('为多边形 ' + polygonData.id + ' 创建标签时出错:', e);
+                                                    console.error('Kesalahan saat membuat label untuk polygon ' + polygonData.id + ':', e);
                                                 }
                                             }, 10);
                                         }
 
-                                        // 添加点击事件以显示详情
+                                        // Menambahkan event klik untuk menampilkan detail
                                         l.on('click', function(e) {
                                             showPolygonDetail(polygonData.id, l.feature.properties, l);
                                         });
@@ -1152,8 +1152,8 @@
                                     });
                                 }
                             } catch (e) {
-                                console.error('解析项目几何信息时出错:', polygonData, e);
-                                showErrorAlert('加载多边形失败: ' + e.message);
+                                console.error('Kesalahan saat mengurai geometri item:', polygonData, e);
+                                showErrorAlert('Gagal memuat polygon: ' + e.message);
                             }
                         });
 
@@ -1197,12 +1197,12 @@
                             }
                         }
                     } else {
-                        showErrorAlert('未找到具有相同 head_id 的多边形');
+                        showErrorAlert('Tidak ditemukan polygon dengan head_id yang sama');
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error("根据 head_id 加载多边形时失败:", status, error);
-                    showErrorAlert("根据 head_id 加载多边形时失败: " + error);
+                    console.error("Gagal memuat polygon berdasarkan head_id:", status, error);
+                    showErrorAlert("Gagal memuat polygon berdasarkan head_id: " + error);
                 }
             });
         }
