@@ -1,5 +1,73 @@
 <div class="map-container" id="map"></div>
 
+<!-- Tombol Cari Mengambang di Atas Peta -->
+<div class="search-button-floating">
+    <button type="button" class="btn btn-primary" id="openSearchModal">
+        <i class="fas fa-search"></i> Cari Nama / No Objek
+    </button>
+</div>
+
+<!-- Modal Pencarian -->
+<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="searchModalLabel">Cari Nama / No Objek</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="searchPolygon" class="form-label">Masukkan nama atau nomor objek:</label>
+                    <input type="text" class="form-control" id="searchPolygon" placeholder="Cari...">
+                </div>
+                
+                <!-- Checkbox kategori di modal pencarian -->
+                <div class="form-group" id="searchCategoryFilterContainer" style="display: none;">
+                    <label>Filter Kategori:</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="selectAllCategories" checked>
+                        <label class="form-check-label" for="selectAllCategories">Semua Kategori</label>
+                    </div>
+                    <div id="searchCategoryCheckboxes">
+                        <!-- Checkbox kategori akan dimuat di sini -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" id="performSearch">Cari</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hasil Pencarian Melayang di Atas Peta -->
+<div id="searchResultsContainer" class="search-results-container floating-above-map">
+    <div class="card">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Hasil Pencarian</h5>
+            <button type="button" class="btn-close" id="closeSearchResults" aria-label="Close"></button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered table-sm mb-0" id="searchResultsTable">
+                    <thead>
+                        <tr>
+                            <th>Nama</th>
+                            <th>Kelurahan</th>
+                            <th>Properties</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Hasil pencarian akan ditampilkan di sini -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal detail polygon di sisi kanan -->
 <div id="polygonDetailModal" class="polygon-detail-modal">
     <div class="polygon-detail-content">
@@ -101,7 +169,8 @@
 
 <style>
     #map {
-        height: 100%;
+        height: 100vh;
+        position: relative;
     }
     
     /* Gaya untuk alert pencarian */
@@ -111,6 +180,39 @@
         right: 10px;
         z-index: 1000;
         display: none;
+    }
+
+    /* Gaya untuk tombol pencarian mengambang */
+    .search-button-floating {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        padding: 10px;
+    }
+
+    /* Gaya untuk hasil pencarian melayang di atas peta */
+    .search-results-container.floating-above-map {
+        position: absolute;
+        top: 70px; /* Di bawah tombol pencarian */
+        left: 20px;
+        right: 20px;
+        max-height: 300px;
+        z-index: 999;
+        display: none;
+        overflow: hidden;
+    }
+
+    .search-results-container.floating-above-map .card {
+        border: 1px solid rgba(0, 0, 0, 0.125);
+        border-radius: 0.375rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+
+    .search-results-container.floating-above-map .card-body {
+        max-height: 250px;
+        overflow-y: auto;
     }
 
     .polygon-detail-modal {
@@ -191,10 +293,6 @@
         pointer-events: auto;
     }
     
-    .search-label {
-        z-index: 1001;
-        font-weight: bold;
-    }
 </style>
 
 <script>
@@ -366,7 +464,26 @@
         });
         
         // Reload data when filter changes
-        $('#filterKel').on('change', loadData);
+        $('#filterKel').on('change', function() {
+            // Sembunyikan container checkbox kategori
+            $('#categoryFilterContainer').hide();
+            
+            // Kosongkan checkbox kategori
+            $('#categoryCheckboxes').empty();
+            
+            // Jika ada nilai yang dipilih dan merupakan angka (ID KML)
+            var selectedValue = $(this).val();
+            // console.log("Selected value:", selectedValue);
+            // console.log("Is numeric:", !isNaN(parseInt(selectedValue)));
+            
+            if (selectedValue && !isNaN(parseInt(selectedValue)) && selectedValue.trim() !== '') {
+                console.log("Loading categories for KML file");
+                // Muat kategori untuk file KML yang dipilih
+                loadCategoryCheckboxes(selectedValue);
+            }
+            
+            loadData();
+        });
         
         // Tambahkan event listener untuk memicu pencarian ketika dropdown berubah
         $('#filterKec, #filterKel').on('change', function() {
@@ -393,6 +510,20 @@
             searchTimeout = setTimeout(function() {
                 searchPolygon(searchTerm);
             }, 300); // Delay 300ms
+        });
+
+        // Event listener untuk membuka modal pencarian
+        $('#openSearchModal').on('click', function() {
+            $('#searchModal').modal('show');
+        });
+
+        // Event listener untuk tombol pencarian di modal
+        $('#performSearch').on('click', function() {
+            var searchTerm = $('#searchPolygon').val();
+            if (searchTerm) {
+                performSearch(searchTerm);
+                $('#searchModal').modal('hide');
+            }
         });
 
         // Inisialisasi feature group untuk drawing
@@ -677,8 +808,19 @@
             // Bangun konten properties
             var propertiesHtml = '';
             if (properties) {
+                // Tampilkan kategori dengan lebih menonjol
+                if (properties.kategori) {
+                    propertiesHtml += '<div class="property-item">' +
+                        '<div class="property-label">Kategori</div>' +
+                        '<div class="property-value"><span class="badge bg-primary">' + properties.kategori + '</span></div>' +
+                        '</div>';
+                }
+                
                 for (var key in properties) {
                     if (properties.hasOwnProperty(key)) {
+                        // Lewati kategori karena sudah ditampilkan di atas
+                        if (key === 'kategori') continue;
+                        
                         // Khusus untuk field properties, parse dan tampilkan dengan format yang lebih baik
                         // console.log('Processing property:', key);
                         if (key === 'properties' && typeof properties[key] === 'string') {
@@ -795,7 +937,7 @@
         });
 
         // Fungsi untuk menyorot polygon yang dipilih
-        function highlightPolygon(polygonId) {
+        function highlightPolygon(polygonId, headId) {
             // Pastikan layerMap dan map sudah terdefinisi
             if (typeof layerMap === 'undefined' || typeof map === 'undefined') {
                 console.error('layerMap atau map belum terdefinisi');
@@ -804,14 +946,294 @@
             
             // Reset semua polygon ke style awal
             resetPolygonHighlight();
-            // console.log("Highlighting polygon with ID:", polygonId);
             
+            // Jika headId diberikan, muat semua polygon dengan head_id tersebut terlebih dahulu
+            if (headId && !isNaN(headId)) {
+                // Set filter kelurahan ke headId (ID file KML)
+                $('#filterKel').val(headId).trigger('change');
+                
+                // Tunggu sebentar untuk memuat data, lalu sorot polygon
+                setTimeout(function() {
+                    // Sorot semua polygon dengan head_id yang sama
+                    highlightAllPolygonsWithHeadId(headId, polygonId);
+                }, 1500); // Memberi waktu lebih untuk memuat data
+            } else {
+                // Jika tidak ada headId, langsung sorot polygon
+                actuallyHighlightPolygon(polygonId);
+            }
+        }
+        
+        // Fungsi baru untuk menyorot semua polygon dengan head_id tertentu
+        function highlightAllPolygonsWithHeadId(headId, targetPolygonId) {
+            var highlightedLayers = [];
+            var targetLayer = null;
+
+            // Pastikan layerMap dan map sudah terdefinisi
+            if (typeof layerMap === 'undefined' || typeof map === 'undefined') {
+                console.error('layerMap atau map belum terdefinisi');
+                return;
+            }
+
+            // Reset semua polygon ke style awal
+            resetPolygonHighlight();
+
+            // Sorot semua polygon dengan head_id yang sama
+            group.eachLayer(function(layer) {
+                // Pastikan layer memiliki feature dan properties
+                if (layer.feature && layer.feature.properties) {
+                    // Cek apakah layer ini memiliki head_id yang sesuai
+                    if (layer.feature.properties.id == targetPolygonId) {
+                        targetLayer = layer;
+                    }
+                    
+                    // Cek apakah layer ini berasal dari KML dengan head_id yang sesuai
+                    if (layer.feature.properties.head_id == headId) {
+                        // Gunakan warna asli dari database
+                        var originalColor = layer.options.originalColor || '#3388ff';
+                        layer.setStyle({
+                            fillOpacity: 0.4,
+                            weight: 2,
+                            color: originalColor
+                        });
+                        
+                        // Simpan layer yang disorot
+                        highlightedLayers.push(layer);
+                        
+                        // Jika ini adalah polygon target, sorot dengan gaya berbeda
+                        if (layer.feature.properties.id == targetPolygonId) {
+                            layer.setStyle({
+                                fillOpacity: 0.7,
+                                weight: 4,
+                                color: originalColor
+                            });
+                        }
+                    }
+                }
+            });
+            
+            // Jika tidak menemukan polygon dengan head_id yang sama dalam layer yang sudah ada,
+            // coba muat polygon target secara spesifik
+            if (highlightedLayers.length === 0 && targetLayer === null) {
+                loadPolygonFromDatabase(targetPolygonId);
+                return;
+            }
+            
+            // Jika ditemukan polygon dengan head_id yang sama, fokuskan ke semua polygon tersebut
+            if (highlightedLayers.length > 0) {
+                // Tunggu sejenak untuk memastikan styling diterapkan
+                setTimeout(function() {
+                    var groupBounds = new L.featureGroup(highlightedLayers).getBounds();
+                    if (groupBounds.isValid()) {
+                        map.fitBounds(groupBounds, { 
+                            padding: [50, 50],
+                            maxZoom: 18
+                        });
+                    }
+                    
+                    // Jika ada target layer, fokuskan lebih spesifik ke target tersebut
+                    if (targetLayer) {
+                        setTimeout(function() {
+                            try {
+                                var bounds = targetLayer.getBounds();
+                                if (bounds.isValid()) {
+                                    map.flyToBounds(bounds, {
+                                        padding: [30, 30],
+                                        maxZoom: 19
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('Error focusing on target polygon:', e);
+                            }
+                        }, 300);
+                    }
+                }, 100);
+            } else if (targetLayer) {
+                // Jika hanya ada target layer, fokuskan ke sana
+                actuallyHighlightPolygon(targetPolygonId);
+            } else {
+                // Jika tidak ditemukan, sorot hanya polygon target
+                loadPolygonFromDatabase(targetPolygonId);
+            }
+        }
+
+        // 新增函数：根据 head_id 从数据库加载多边形
+        function loadPolygonsFromDatabaseByHeadId(headId, targetPolygonId) {
+            $.ajax({
+                url: '<?= base_url("index.php/map/data_by_head_id") ?>',
+                type: 'GET',
+                data: { head_id: headId },
+                success: function(response) {
+                    if (response && response.length > 0) {
+                        response.forEach(function(polygonData) {
+                            try {
+                                if (polygonData.geometry) {
+                                    var gj = JSON.parse(polygonData.geometry);
+                                    var layer = L.geoJSON(gj, {
+                                        style: styleFor(polygonData.color)
+                                    });
+
+                                    // 添加数据到 layer
+                                    layer.eachLayer(function(l) {
+                                        // 保存原始颜色
+                                        l.options.originalColor = polygonData.color || '#3388ff';
+
+                                        l.feature = {};
+                                        l.feature.properties = {
+                                            id: polygonData.id,
+                                            name: polygonData.name,
+                                            kelurahan: polygonData.kelurahan,
+                                            kecamatan_id: polygonData.kecamatan_id,
+                                            properties: polygonData.properties,
+                                            head_id: polygonData.head_id // 添加 head_id 属性
+                                        };
+
+                                        // 保存 layer 引用
+                                        layerMap[polygonData.id] = l;
+
+                                        // 添加到 group
+                                        l.addTo(group);
+
+                                        // 添加标签（如果有）
+                                        var lastFiveDigits = extractLastFiveDigits(polygonData.name);
+                                        if (lastFiveDigits) {
+                                            setTimeout(function() {
+                                                try {
+                                                    if (l.getBounds && l.getBounds().isValid && l.getBounds().isValid()) {
+                                                        var center = l.getBounds().getCenter();
+
+                                                        // 创建标签
+                                                        var label = L.marker(center, {
+                                                            icon: L.divIcon({
+                                                                className: 'polygon-label',
+                                                                html: '<div style="background: rgba(255, 255, 255, 0.9); padding: 2px 5px; border-radius: 3px; font-weight: bold; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.3);">' + lastFiveDigits + '</div>',
+                                                                iconSize: [50, 20]
+                                                            }),
+                                                            zIndexOffset: 1000
+                                                        }).addTo(map);
+
+                                                        // 添加点击事件以显示详情
+                                                        label.on('click', function(e) {
+                                                            showPolygonDetail(polygonData.id, l.feature.properties, l);
+                                                        });
+
+                                                        // 保存标签引用
+                                                        if (!l.labels) l.labels = [];
+                                                        l.labels.push(label);
+                                                    }
+                                                } catch (e) {
+                                                    console.error('为多边形 ' + polygonData.id + ' 创建标签时出错:', e);
+                                                }
+                                            }, 10);
+                                        }
+
+                                        // 添加点击事件以显示详情
+                                        l.on('click', function(e) {
+                                            showPolygonDetail(polygonData.id, l.feature.properties, l);
+                                        });
+
+                                        // Jika adalah target polygon, sorot dengan gaya berbeda
+                                        if (polygonData.id == targetPolygonId) {
+                                            l.setStyle({
+                                                fillOpacity: 0.6,
+                                                weight: 5,
+                                                color: '#FF0000'
+                                            });
+                                        } else {
+                                            l.setStyle({
+                                                fillOpacity: 0.4,
+                                                weight: 3,
+                                                color: '#FFA500'
+                                            });
+                                        }
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('解析项目几何信息时出错:', polygonData, e);
+                                showErrorAlert('加载多边形失败: ' + e.message);
+                            }
+                        });
+
+                        // 调整地图视图以展示所有相关多边形
+                        var relatedLayers = [];
+                        group.eachLayer(function(layer) {
+                            if (layer.feature && layer.feature.properties && layer.feature.properties.head_id == headId) {
+                                relatedLayers.push(layer);
+                            }
+                        });
+
+                        if (relatedLayers.length > 0) {
+                            var groupBounds = new L.featureGroup(relatedLayers).getBounds();
+                            if (groupBounds.isValid()) {
+                                map.fitBounds(groupBounds, { 
+                                    padding: [50, 50],
+                                    maxZoom: 18
+                                });
+                            }
+                        }
+                    } else {
+                        showErrorAlert('未找到具有相同 head_id 的多边形');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("根据 head_id 加载多边形时失败:", status, error);
+                    showErrorAlert("根据 head_id 加载多边形时失败: " + error);
+                }
+            });
+        }
+
+        // Fungsi untuk memuat data untuk kelurahan tertentu
+        function loadDataForKelurahan(kelurahan, callback) {
+            // Simpan filter saat ini
+            var currentKelFilter = $('#filterKel').val();
+            var currentKecFilter = $('#filterKec').val();
+            
+            // Set filter kelurahan
+            $('#filterKel').val(kelurahan);
+            
+            // Muat data
+            loadData();
+            
+            // Kembalikan filter setelah selesai (jika diperlukan)
+            if (callback) {
+                // Tunggu sebentar untuk memastikan data dimuat
+                setTimeout(callback, 500);
+            }
+        }
+        
+        // Fungsi aktual untuk menyorot polygon
+        function actuallyHighlightPolygon(polygonId) {
             // Temukan polygon berdasarkan ID
             var layer = layerMap[polygonId];
-           
-                // Jika polygon tidak ditemukan di layer saat ini, ambil dari database
-               loadPolygonFromDatabase(polygonId);
             
+            // Jika polygon tidak ditemukan di layer saat ini, ambil dari database
+            if (!layer) {
+                loadPolygonFromDatabase(polygonId);
+            } else {
+                // Sorot polygon yang ditemukan
+                layer.setStyle({
+                    fillOpacity: 0.6,
+                    weight: 4,
+                    color: layer.options.originalColor || '#3388ff'
+                });
+                
+                // Fokuskan peta ke polygon yang dipilih
+                setTimeout(function() {
+                    try {
+                        var bounds = layer.getBounds();
+                        if (bounds.isValid()) {
+                            map.fitBounds(bounds, {
+                                padding: [50, 50],
+                                maxZoom: 18
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Error focusing on polygon:', e);
+                    }
+                }, 50);
+                
+                // Simpan referensi polygon yang disorot
+                window.highlightedPolygon = polygonId;
+            }
         }
         
         // Fungsi untuk memuat polygon dari database
@@ -850,10 +1272,127 @@
 
                                     // Tambahkan ke group terlebih dahulu
                                     l.addTo(group);
-                                    console.log("Added polygon with ID:", polygonData);
                                     // Tambahkan label dengan 5 digit terakhir jika nama sesuai pola
                                     var lastFiveDigits = extractLastFiveDigits(polygonData.name);
-                                    console.log("Last five digits extracted:", polygonData.name, lastFiveDigits);
+                                    if (lastFiveDigits) {
+                                        // Tunggu sampai layer benar-benar ditambahkan ke peta
+                                        setTimeout(function() {
+                                            try {
+                                                if (l.getBounds && l.getBounds().isValid && l.getBounds().isValid()) {
+                                                    var center = l.getBounds().getCenter();
+
+                                                    // Buat label di tengah poligon
+                                                    var label = L.marker(center, {
+                                                        icon: L.divIcon({
+                                                            className: 'polygon-label',
+                                                            html: '<div style="background: rgba(255, 255, 255, 0.9); padding: 2px 5px; border-radius: 3px; font-weight: bold; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.3);">' + lastFiveDigits + '</div>',
+                                                            iconSize: [50, 20]
+                                                        }),
+                                                        // Pastikan label muncul di atas semua layer lain
+                                                        zIndexOffset: 1000
+                                                    }).addTo(map);
+
+                                                    // Tambahkan event listener untuk menampilkan detail ketika label diklik
+                                                    label.on('click', function(e) {
+                                                        showPolygonDetail(polygonData.id, l.feature.properties, l);
+                                                    });
+
+                                                    // Simpan referensi label agar bisa dihapus nanti
+                                                    if (!l.labels) l.labels = [];
+                                                    l.labels.push(label);
+                                                }
+                                            } catch (e) {
+                                                console.error('Error creating label for polygon ' + polygonData.id + ':', e);
+                                            }
+                                        }, 10);
+                                    }
+
+                                    // Tambahkan event klik untuk menampilkan detail
+                                    l.on('click', function(e) {
+                                        showPolygonDetail(polygonData.id, l.feature.properties, l);
+                                    });
+
+                                    // Sorot polygon yang baru dimuat dengan warna asli dari database
+                                    l.setStyle({
+                                        fillOpacity: 0.6,
+                                        weight: 4,
+                                        color: polygonData.color || '#3388ff'
+                                    });
+
+                                    // Fokuskan peta ke polygon yang dipilih
+                                    setTimeout(function() {
+                                        try {
+                                            var bounds = l.getBounds();
+                                            if (bounds.isValid()) {
+                                                map.fitBounds(bounds, {
+                                                    padding: [50, 50],
+                                                    maxZoom: 18
+                                                });
+                                            }
+                                        } catch (e) {
+                                            console.error('Error focusing on polygon:', e);
+                                        }
+                                    }, 50);
+
+                                    // Simpan referensi polygon yang sedang disorot
+                                    window.highlightedPolygon = polygonData.id;
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Error parsing geometry for item:', polygonData, e);
+                            showErrorAlert('Gagal memuat polygon: ' + e.message);
+                        }
+                    } else {
+                        showErrorAlert('Polygon tidak ditemukan di database');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("Failed to load polygon from database:", status, error);
+                    showErrorAlert("Gagal memuat polygon dari database: " + error);
+                }
+            });
+        }
+        
+        // Fungsi aktual untuk memuat polygon dari database
+        function actualLoadPolygon(polygonId) {
+            $.ajax({
+                url: '<?= base_url("index.php/map/data") ?>',
+                type: 'GET',
+                data: { polygon_id: polygonId },
+                success: function(response) {
+                    if (response && response.length > 0) {
+                        var polygonData = response[0];
+
+                        try {
+                            if (polygonData.geometry) {
+                                var gj = JSON.parse(polygonData.geometry);
+                                var layer = L.geoJSON(gj, {
+                                    style: styleFor(polygonData.color)
+                                });
+
+                                // Tambahkan data ke layer
+                                layer.eachLayer(function(l) {
+                                    // Simpan warna asli
+                                    l.options.originalColor = polygonData.color || '#3388ff';
+
+                                    l.feature = {};
+                                    l.feature.properties = {
+                                        id: polygonData.id,
+                                        name: polygonData.name,
+                                        kelurahan: polygonData.kelurahan,
+                                        kecamatan_id: polygonData.kecamatan_id,
+                                        properties: polygonData.properties
+                                    };
+
+                                    // Simpan referensi layer
+                                    layerMap[polygonData.id] = l;
+
+                                    // Tambahkan ke group terlebih dahulu
+                                    l.addTo(group);
+                                    // console.log("Added polygon with ID:", polygonData);
+                                    // Tambahkan label dengan 5 digit terakhir jika nama sesuai pola
+                                    var lastFiveDigits = extractLastFiveDigits(polygonData.name);
+                                    // console.log("Last five digits extracted:", polygonData.name, lastFiveDigits);
                                     if (lastFiveDigits) {
                                         // Tunggu sampai layer benar-benar ditambahkan ke peta
                                         setTimeout(function() {
@@ -995,7 +1534,19 @@
             var url;
             if (k && !isNaN(k)) {
                 // Jika kelurahan adalah ID file KML (angka)
-                url = '<?= base_url('index.php/map/kml_data/') ?>' + k;
+                // Periksa apakah ada kategori yang dipilih
+                var selectedCategories = [];
+                $('input[name="categoryFilter"]:checked').each(function() {
+                    selectedCategories.push($(this).val());
+                });
+                
+                if (selectedCategories.length > 0) {
+                    // Jika ada kategori yang dipilih, gunakan endpoint filtered
+                    url = '<?= base_url('index.php/map/kml_filtered_data') ?>?head_id=' + k + '&categories[]=' + selectedCategories.join('&categories[]=');
+                } else {
+                    // Jika tidak ada kategori yang dipilih, gunakan endpoint biasa
+                    url = '<?= base_url('index.php/map/kml_data/') ?>' + k;
+                }
             } else if (k) {
                 // Jika kelurahan biasa (bukan angka)
                 url = '<?= base_url('index.php/map/data') ?>?kelurahan=' + encodeURIComponent(k);
@@ -1383,13 +1934,180 @@
             
             return null;
         }
-
+        
+        // Fungsi untuk memuat checkbox kategori berdasarkan ID file KML
+        function loadCategoryCheckboxes(headId) {
+            // Pastikan headId adalah angka (menunjukkan ID file KML)
+            if (!isNaN(headId)) {
+                $.getJSON('<?= base_url('index.php/map/kml_polygon_categories/') ?>' + headId, function(categories) {
+                    if (categories && categories.length > 0) {
+                        var container = $('#categoryCheckboxes');
+                        container.empty();
+                        
+                        // Tambahkan checkbox untuk setiap kategori
+                        categories.forEach(function(category) {
+                            var checkboxId = 'category_' + category.replace(/\s+/g, '_');
+                            var checkboxHtml = 
+                                '<div class="form-check">' +
+                                '<input class="form-check-input" type="checkbox" name="categoryFilter" value="' + category + '" id="' + checkboxId + '">' +
+                                '<label class="form-check-label" for="' + checkboxId + '">' + category + '</label>' +
+                                '</div>';
+                            container.append(checkboxHtml);
+                        });
+                        
+                        // Tampilkan container
+                        $('#categoryFilterContainer').show();
+                    } else {
+                        // Sembunyikan container jika tidak ada kategori
+                        $('#categoryFilterContainer').hide();
+                    }
+                }).fail(function() {
+                    // Sembunyikan container jika gagal memuat
+                    $('#categoryFilterContainer').hide();
+                });
+            } else {
+                // Sembunyikan container jika headId bukan angka (bukan file KML)
+                $('#categoryFilterContainer').hide();
+            }
+        }
+        
         // Initial load
         loadData();
 
         // Export button
         $('#btnExportGeo').on('click', function() {
             window.location = '<?= base_url('index.php/export/geojson') ?>';
+        });
+        
+        // Event listener untuk checkbox kategori
+        $(document).on('change', 'input[name="categoryFilter"]', function() {
+            loadData();
+        });
+        
+        // Event listener untuk checkbox kategori di modal pencarian
+        $(document).on('change', 'input[name="searchCategoryFilter"]', function() {
+            // Tidak perlu melakukan apa-apa saat checkbox di modal berubah
+            // Kategori akan digunakan saat pencarian dilakukan
+        });
+        
+        // Event listener untuk checkbox "Semua Kategori"
+        $(document).on('change', '#selectAllCategories', function() {
+            if (this.checked) {
+                // Jika "Semua Kategori" dicentang, nonaktifkan checkbox kategori lainnya
+                $('input[name="searchCategoryFilter"]').prop('disabled', true);
+            } else {
+                // Jika "Semua Kategori" tidak dicentang, aktifkan checkbox kategori lainnya
+                $('input[name="searchCategoryFilter"]').prop('disabled', false);
+            }
+        });
+        
+        // Event listener untuk checkbox kategori individual
+        $(document).on('change', 'input[name="searchCategoryFilter"]', function() {
+            // Periksa apakah ada checkbox kategori yang dicentang
+            var anyCategoryChecked = $('input[name="searchCategoryFilter"]:checked').length > 0;
+            
+            if (anyCategoryChecked) {
+                // Jika ada kategori yang dicentang, noncentang "Semua Kategori"
+                $('#selectAllCategories').prop('checked', false);
+            } else {
+                // Jika tidak ada kategori yang dicentang, centang "Semua Kategori"
+                $('#selectAllCategories').prop('checked', true);
+            }
+        });
+        
+        // Event listener untuk menutup hasil pencarian
+        $('#btnCloseSearchResults').on('click', function() {
+            $('#searchResultsContainer').hide();
+        });
+        
+        // Fungsi pencarian objek
+        function performSearch(searchTerm) {
+            if (!searchTerm) {
+                $('#searchResultsContainer').hide();
+                return;
+            }
+            
+            // Periksa apakah "Semua Kategori" dicentang
+            var selectAllCategories = $('#selectAllCategories').is(':checked');
+            
+            // Dapatkan kategori yang dipilih di modal pencarian (jika tidak memilih semua)
+            var selectedCategories = [];
+            if (!selectAllCategories) {
+                $('input[name="searchCategoryFilter"]:checked').each(function() {
+                    selectedCategories.push($(this).val());
+                });
+            }
+            
+            // Siapkan data untuk dikirim
+            var requestData = {
+                term: searchTerm
+            };
+            
+            // Tambahkan kategori jika ada yang dipilih
+            if (!selectAllCategories && selectedCategories.length > 0) {
+                requestData.categories = selectedCategories;
+            }
+            
+            // Lakukan pencarian ke server
+            $.ajax({
+                url: '<?= base_url("index.php/map/search_polygon") ?>',
+                type: 'GET',
+                data: requestData,
+                success: function(response) {
+                    if (response.results && response.results.length > 0) {
+                        displaySearchResults(response.results);
+                        // Tampilkan hasil pencarian
+                        $('#searchResultsContainer').show();
+                    } else {
+                        $('#searchResultsContainer').hide();
+                        showInfoAlert('Tidak ditemukan hasil untuk "' + searchTerm + '"');
+                    }
+                },
+                error: function() {
+                    showErrorAlert('Gagal melakukan pencarian');
+                }
+            });
+        }
+        
+        // Fungsi untuk menampilkan hasil pencarian dalam tabel
+        function displaySearchResults(results) {
+            var tbody = $('#searchResultsTable tbody');
+            tbody.empty();
+            
+            results.forEach(function(result) {
+                var row = $('<tr>');
+                row.append($('<td>').text(result.text || '-'));
+                row.append($('<td>').text(result.kelurahan || '-'));
+                row.append($('<td>').text(result.properties || '-'));
+                var actionCell = $('<td>');
+                var viewBtn = $('<button class="btn btn-sm btn-primary">')
+                    .html('<i class="fas fa-eye"></i> Lihat')
+                    .on('click', function() {
+                        highlightPolygon(result.id, result.head_id);
+                        $('#searchResultsContainer').hide();
+                    });
+                actionCell.append(viewBtn);
+                row.append(actionCell);
+                tbody.append(row);
+            });
+            
+            // Tampilkan container hasil pencarian melayang di atas peta
+            $('#searchResultsContainer').show();
+        }
+        
+        // Event listener untuk memuat kategori saat modal pencarian dibuka
+        $('#searchModal').on('show.bs.modal', function () {
+            // Dapatkan nilai filter kelurahan yang saat ini dipilih
+            var selectedKelurahan = $('#filterKel').val();
+            
+            // Jika ada nilai yang dipilih dan merupakan angka (ID KML)
+            if (selectedKelurahan && !isNaN(parseInt(selectedKelurahan)) && selectedKelurahan.trim() !== '') {
+                // Muat kategori untuk file KML yang dipilih
+                loadSearchCategoryCheckboxes(selectedKelurahan);
+            } else {
+                // Sembunyikan container kategori jika tidak ada file KML yang dipilih
+                $('#searchCategoryFilterContainer').hide();
+            }
         });
     });
 </script>

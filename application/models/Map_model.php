@@ -38,11 +38,20 @@ class Map_model extends CI_Model {
     }
     
     // Fungsi untuk pencarian polygon (untuk Select2)
-    public function search_polygon($term = '', $limit = 20, $offset = 0) {
+    public function search_polygon($term = '', $limit = 20, $offset = 0, $categories = null) {
         if (!empty($term)) {
             $this->db->group_start();
             $this->db->like('name', $term);
             $this->db->or_like('kelurahan', $term);
+            $this->db->group_end();
+        }
+        
+        // Filter berdasarkan kategori jika ada
+        if (!empty($categories) && is_array($categories)) {
+            $this->db->group_start();
+            foreach ($categories as $category) {
+                $this->db->or_where('kategori', $category);
+            }
             $this->db->group_end();
         }
         
@@ -63,6 +72,17 @@ class Map_model extends CI_Model {
             $this->db->group_end();
         }
         
+        // Filter berdasarkan kategori untuk data KML
+        if (!empty($categories) && is_array($categories)) {
+            $this->db->group_start();
+            foreach ($categories as $category) {
+                $this->db->or_where('kd.kategori', $category);
+                // Juga filter berdasarkan TIPEHAK dalam properties
+                $this->db->or_where("JSON_EXTRACT(kd.properties, '$.TIPEHAK')", $category);
+            }
+            $this->db->group_end();
+        }
+        
         $this->db->select("kd.*, kh.name as kelurahan_name");
         $this->db->from("{$this->kml_detail_table} kd");
         $this->db->join("{$this->kml_head_table} kh", "kd.head_id = kh.id", "left");
@@ -74,15 +94,39 @@ class Map_model extends CI_Model {
         $kml_data = $kml_data_query->result();
         
         // Gabungkan data
-        return array_merge($old_data, $kml_data);
+        $merged_data = array_merge($old_data, $kml_data);
+        
+        // Pastikan setiap item memiliki properti kelurahan dan kategori
+        foreach ($merged_data as $item) {
+            // Untuk data KML, gunakan kelurahan_name jika kelurahan tidak ada
+            if (!isset($item->kelurahan) && isset($item->kelurahan_name)) {
+                $item->kelurahan = $item->kelurahan_name;
+            }
+            
+            // Pastikan kategori ada
+            if (!isset($item->kategori)) {
+                $item->kategori = '';
+            }
+        }
+        
+        return $merged_data;
     }
     
     // Fungsi untuk menghitung total hasil pencarian polygon
-    public function count_search_polygon($term = '') {
+    public function count_search_polygon($term = '', $categories = null) {
         if (!empty($term)) {
             $this->db->group_start();
             $this->db->like('name', $term);
             $this->db->or_like('kelurahan', $term);
+            $this->db->group_end();
+        }
+        
+        // Filter berdasarkan kategori jika ada
+        if (!empty($categories) && is_array($categories)) {
+            $this->db->group_start();
+            foreach ($categories as $category) {
+                $this->db->or_where('kategori', $category);
+            }
             $this->db->group_end();
         }
         
@@ -96,6 +140,17 @@ class Map_model extends CI_Model {
             $this->db->group_start();
             $this->db->like('kd.name', $term);
             $this->db->or_like('kd.kelurahan', $term);
+            $this->db->group_end();
+        }
+        
+        // Filter berdasarkan kategori untuk data KML
+        if (!empty($categories) && is_array($categories)) {
+            $this->db->group_start();
+            foreach ($categories as $category) {
+                $this->db->or_where('kd.kategori', $category);
+                // Juga filter berdasarkan TIPEHAK dalam properties
+                $this->db->or_where("JSON_EXTRACT(kd.properties, '$.TIPEHAK')", $category);
+            }
             $this->db->group_end();
         }
         

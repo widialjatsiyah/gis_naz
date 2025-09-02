@@ -46,18 +46,23 @@ class Map extends CI_Controller {
     public function search_polygon() {
         $term = $this->input->get('term', TRUE);
         $page = $this->input->get('page', TRUE) ?: 1;
+        $categories = $this->input->get('categories', TRUE); // Mendapatkan kategori yang dipilih
         $limit = 20;
         $offset = ($page - 1) * $limit;
         
         // Dapatkan hasil pencarian dari model
-        $results = $this->mm->search_polygon($term, $limit, $offset);
-        $total_count = $this->mm->count_search_polygon($term);
+        $results = $this->mm->search_polygon($term, $limit, $offset, $categories);
+        $total_count = $this->mm->count_search_polygon($term, $categories);
         
         $data = [];
         foreach ($results as $row) {
+            // Tambahkan informasi tambahan
             $data[] = [
                 'id' => $row->id,
-                'text' => $row->name 
+                'text' => $row->name,
+                'kelurahan' => isset($row->kelurahan) ? $row->kelurahan : '',
+                'kategori' => isset($row->kategori) ? $row->kategori : '',
+                'head_id' => isset($row->head_id) ? $row->head_id : null // Tambahkan head_id
             ];
         }
         
@@ -75,6 +80,50 @@ class Map extends CI_Controller {
     public function kml_data($head_id){ 
         $rows = $this->mm->get_kml_data_by_head_id($head_id); 
         return $this->output->set_content_type('application/json')->set_output(json_encode($rows)); 
+    }
+    
+    // Fungsi untuk mendapatkan daftar tipe poligon dalam file KML
+    public function kml_polygon_types($head_id) {
+        $this->load->model('Kml_model');
+        $types = $this->Kml_model->get_polygon_types($head_id);
+        return $this->output->set_content_type('application/json')->set_output(json_encode($types));
+    }
+    
+    // Fungsi untuk mendapatkan data KML berdasarkan ID file dan tipe poligon
+    public function kml_data_by_types() {
+        $head_id = $this->input->get('head_id');
+        $types = $this->input->get('types'); // Array of types
+        
+        $this->load->model('Kml_model');
+        if ($types && is_array($types)) {
+            $rows = $this->Kml_model->get_detail_data_by_types($head_id, $types);
+        } else {
+            $rows = $this->Kml_model->get_detail_data($head_id);
+        }
+        
+        return $this->output->set_content_type('application/json')->set_output(json_encode($rows));
+    }
+    
+    // Fungsi untuk mendapatkan daftar kategori poligon dalam file KML
+    public function kml_polygon_categories($head_id) {
+        $this->load->model('Kml_model');
+        $categories = $this->Kml_model->get_polygon_categories($head_id);
+        return $this->output->set_content_type('application/json')->set_output(json_encode($categories));
+    }
+    
+    // Fungsi untuk mendapatkan daftar kategori poligon dalam file KML berdasarkan filter
+    public function kml_filtered_data() {
+        $head_id = $this->input->get('head_id');
+        $categories = $this->input->get('categories'); // Array of categories
+        
+        $this->load->model('Kml_model');
+        if ($categories && is_array($categories)) {
+            $rows = $this->Kml_model->get_detail_data_by_categories($head_id, $categories);
+        } else {
+            $rows = $this->Kml_model->get_detail_data($head_id);
+        }
+        
+        return $this->output->set_content_type('application/json')->set_output(json_encode($rows));
     }
     
     // Fungsi untuk menyimpan polygon yang digambar langsung di peta

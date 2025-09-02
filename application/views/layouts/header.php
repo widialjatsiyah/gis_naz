@@ -162,6 +162,14 @@
                     </select>
                 </div>
                 
+                <!-- Checkbox kategori -->
+                <div class="form-group" id="categoryFilterContainer" style="display: none;">
+                    <label>Filter Kategori:</label>
+                    <div id="categoryCheckboxes">
+                        <!-- Checkbox kategori akan dimuat di sini -->
+                    </div>
+                </div>
+                
                 <!-- Hidden container for storing original options -->
                 <div id="filterKelContainer" style="display: none;">
                     <?php foreach($kelurahan_list as $k): ?>
@@ -174,6 +182,31 @@
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
+                
+                <!-- Container untuk hasil pencarian -->
+                <!-- <div id="searchResultsContainer" class="mt-3" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Hasil Pencarian</h6>
+                        <button id="closeSearchResults" class="btn btn-sm btn-outline-secondary py-0">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table id="searchResultsTable" class="table table-striped table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Nama</th>
+                                    <th>Kelurahan</th>
+                                    <th>Kategori</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                 Hasil pencarian akan dimuat di s
+                            </tbody>
+                        </table>
+                    </div>
+                </div> -->
             </div>
         </div>
         <div class="content">

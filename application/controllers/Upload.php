@@ -99,6 +99,49 @@ class Upload extends CI_Controller
                     $properties['description'] = (string)$pm->description;
                 }
                 
+                // Ekstrak informasi folder induk
+                $parent = $pm->xpath('parent::Folder|parent::kml:Folder');
+                if (!empty($parent)) {
+                    $folder_name = (string)($parent[0]->name ?? '');
+                    if (!empty($folder_name)) {
+                        $properties['folder_name'] = $folder_name;
+                    }
+                }
+                
+                // Jika tidak menemukan folder langsung, coba cari folder ancestor
+                if (!isset($properties['folder_name'])) {
+                    $ancestors = $pm->xpath('ancestor::Folder|ancestor::kml:Folder');
+                    if (!empty($ancestors)) {
+                        // Ambil folder terdekat (yang paling dalam)
+                        $closest_folder = end($ancestors);
+                        $folder_name = (string)($closest_folder->name ?? '');
+                        if (!empty($folder_name)) {
+                            $properties['folder_name'] = $folder_name;
+                        }
+                    }
+                }
+                
+                // Ekstrak kategori dari deskripsi jika tersedia
+                if (isset($properties['description'])) {
+                    $description = $properties['description'];
+                    // Ekstrak ZNT dari deskripsi
+                    if (preg_match('/ZNT\s*:\s*(\w+)/i', $description, $matches)) {
+                        $properties['extracted_kategori'] = 'ZNT';
+                    } 
+                    // Ekstrak BLOK dari deskripsi
+                    elseif (preg_match('/BLOK\s*:\s*(\w+)/i', $description, $matches)) {
+                        $properties['extracted_kategori'] = 'BLOK';
+                    }
+                    // Ekstrak OBJEK PAJAK dari deskripsi
+                    elseif (stripos($description, 'OBJEK PAJAK') !== false) {
+                        $properties['extracted_kategori'] = 'OBJEK PAJAK';
+                    }
+                    // Ekstrak OBJEK dari deskripsi
+                    elseif (stripos($description, 'OBJEK') !== false) {
+                        $properties['extracted_kategori'] = 'OBJEK';
+                    }
+                }
+                
                 // Ekstrak warna dari style
                 $color = '#3388ff'; // default color
                 if (isset($pm->styleUrl)) {

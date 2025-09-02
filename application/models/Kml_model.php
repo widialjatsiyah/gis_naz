@@ -65,10 +65,51 @@ class Kml_model extends CI_Model {
         
         // Simpan data detail
         foreach ($features as $feature) {
+            // Ekstrak kategori dari struktur folder KML (BLOK, ZNT, OBJEK PAJAK)
+            $kategori = '';
+            
+            // Cek apakah ada informasi folder dalam properties
+            if (isset($feature['properties']['folder_name'])) {
+                $folder_name = $feature['properties']['folder_name'];
+                // Cek apakah nama folder mengandung kata kunci yang diinginkan
+                if (stripos($folder_name, 'BLOK') !== false) {
+                    $kategori = 'BLOK';
+                } elseif (stripos($folder_name, 'ZNT') !== false) {
+                    $kategori = 'ZNT';
+                } elseif (stripos($folder_name, 'OBJEK PAJAK') !== false) {
+                    $kategori = 'OBJEK PAJAK';
+                } elseif (stripos($folder_name, 'OBJEK') !== false && stripos($folder_name, 'OBJEK PAJAK') === false) {
+                    $kategori = 'OBJEK';
+                }
+            }
+            
+            // Jika tidak ditemukan dari nama folder, cek dari nama polygon itu sendiri
+            if (empty($kategori) && isset($feature['properties']['name'])) {
+                $polygon_name = $feature['properties']['name'];
+                // Cek apakah nama polygon adalah "ZONA NILAI TANAH"
+                if (strtoupper(trim($polygon_name)) === 'ZONA NILAI TANAH') {
+                    $kategori = 'ZNT';
+                }
+            }
+            
+            // Jika tidak ditemukan dari nama folder atau nama polygon, cek dari deskripsi
+            if (empty($kategori) && isset($feature['properties']['extracted_kategori'])) {
+                $kategori = $feature['properties']['extracted_kategori'];
+            }
+            
+            // Jika tidak ditemukan dari nama folder, nama polygon, atau deskripsi, fallback ke cara lama
+            if (empty($kategori)) {
+                if (isset($feature['properties']['TIPEHAK'])) {
+                    $kategori = $feature['properties']['TIPEHAK'];
+                } else if (isset($feature['properties']['kategori'])) {
+                    $kategori = $feature['properties']['kategori'];
+                }
+            }
+            
             $detail_data = [
                 'head_id' => $head_id,
                 'kelurahan' => isset($feature['properties']['kelurahan']) ? $feature['properties']['kelurahan'] : '',
-                'kategori' => isset($feature['properties']['kategori']) ? $feature['properties']['kategori'] : '',
+                'kategori' => $kategori,
                 'name' => isset($feature['properties']['name']) ? $feature['properties']['name'] : '',
                 'color' => isset($feature['properties']['color']) ? $feature['properties']['color'] : '#3388ff',
                 'properties' => json_encode($feature['properties']),
@@ -149,15 +190,96 @@ class Kml_model extends CI_Model {
     }
     
     public function update_kecamatan($id, $data) {
-        return $this->db->where('id', $id)->update($this->kecamatan_table, $data);
+        $this->db->where('id', $id);
+        return $this->db->update($this->kecamatan_table, $data);
     }
     
-    public function delete_kecamatan($id) {
-        return $this->db->delete($this->kecamatan_table, ['id' => $id]);
+    // Fungsi untuk mendapatkan daftar tipe poligon yang tersedia dalam file KML
+    public function get_polygon_types($head_id) {
+        $this->db->select("DISTINCT JSON_EXTRACT(properties, '$.TIPEHAK') as tipehak", false);
+        $this->db->from($this->detail_table);
+        $this->db->where('head_id', $head_id);
+        $this->db->where("JSON_EXTRACT(properties, '$.TIPEHAK') IS NOT NULL");
+        $query = $this->db->get();
+        
+        $types = [];
+        foreach ($query->result() as $row) {
+            // Membersihkan hasil dari tanda kutip jika ada
+            $tipe = trim($row->tipehak, '"');
+            if (!empty($tipe)) {
+                $types[] = $tipe;
+            }
+        }
+        
+        return $types;
     }
     
-    // Fungsi untuk mendapatkan KML head berdasarkan kecamatan
-    public function get_kml_by_kecamatan($kecamatan_id) {
-        return $this->db->get_where($this->head_table, ['kecamatan_id' => $kecamatan_id])->result_array();
+    // Fungsi untuk mendapatkan data detail berdasarkan tipe poligon
+    public function get_detail_data_by_types($head_id, $types = []) {
+        $this->db->from($this->detail_table);
+        $this->db->where('head_id', $head_id);
+        
+        if (!empty($types)) {
+            $this->db->group_start();
+            foreach ($types as $type) {
+                $this->db->or_where("JSON_EXTRACT(properties, '$.TIPEHAK')", $type);
+            }
+            $this->db->group_end();
+        }
+        
+        return $this->db->get()->result_array();
+    }
+    
+    // Fungsi untuk mendapatkan daftar kategori poligon yang tersedia dalam file KML
+    public function get_polygon_categories($head_id) {
+        $categories = [];
+        
+        // Dapatkan kategori dari field kategori
+        $this->db->select("DISTINCT (kategori)");
+        $this->db->from($this->detail_table);
+        $this->db->where('head_id', $head_id);
+        $this->db->where("kategori IS NOT NULL");
+        $this->db->where("kategori != ''");
+        $query = $this->db->get();
+        
+        foreach ($query->result() as $row) {
+            if (!empty($row->kategori)) {
+                $categories[] = $row->kategori;
+            }
+        }
+        
+        // Dapatkan kategori dari field TIPEHAK dalam properties
+        $this->db->select("DISTINCT JSON_EXTRACT(properties, '$.TIPEHAK') as tipehak", false);
+        $this->db->from($this->detail_table);
+        $this->db->where('head_id', $head_id);
+        $this->db->where("JSON_EXTRACT(properties, '$.TIPEHAK') IS NOT NULL");
+        $query = $this->db->get();
+        
+        foreach ($query->result() as $row) {
+            // Bersihkan hasil dari tanda kutip jika ada
+            $tipe = trim($row->tipehak, '"');
+            if (!empty($tipe)) {
+                $categories[] = $tipe;
+            }
+        }
+        
+        // Hapus duplikat dan kembalikan array unik
+        return array_unique($categories);
+    }
+    
+    // Fungsi untuk mendapatkan data detail berdasarkan kategori poligon
+    public function get_detail_data_by_categories($head_id, $categories = []) {
+        $this->db->from($this->detail_table);
+        $this->db->where('head_id', $head_id);
+        
+        if (!empty($categories)) {
+            $this->db->group_start();
+            foreach ($categories as $category) {
+                $this->db->or_where("kategori", $category);
+            }
+            $this->db->group_end();
+        }
+        
+        return $this->db->get()->result_array();
     }
 }
